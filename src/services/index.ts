@@ -1,0 +1,10 @@
+// Export all CRUD services from a single entry point
+export * from './carriers.service'
+export * from './drivers.service'
+export * from './vehicles.service'
+export * from './trailers.service'
+export * from './fleetSets.service'
+export * from './products.service'
+export * from './locations.service'
+export * from './routes.service'
+export * from './dispatchOrders.service'

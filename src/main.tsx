@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { AuthProvider } from './lib/auth-context'
 import { router } from './routes/index.tsx'
-import 'maplibre-gl/dist/maplibre-gl.css'
 import './index.css'
 
 createRoot(document.getElementById('root')!).render(

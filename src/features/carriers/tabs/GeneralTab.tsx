@@ -3,7 +3,7 @@ import { InputField, SelectField } from '../../../components/widgets/FormField'
 import { FormActions } from '../../../components/widgets/FormActions'
 import { useState, useEffect } from 'react'
 import { carriersService } from '../../../services/carriers.service'
-import { supabase } from '../../../lib/supabase'
+import { useOrganization } from '../../../hooks/useOrganization'
 import type {
   Carrier,
   CarrierInsert,
@@ -23,7 +23,9 @@ export function GeneralTab({
   onSave,
   onCancel,
 }: GeneralTabProps) {
-  const [orgId, setOrgId] = useState<string | null>(null)
+  // Use the hook that supports platform admin selected org
+  const { orgId, loading: orgLoading } = useOrganization()
+
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     carrier_id: carrier?.carrier_id || '',
@@ -42,32 +44,6 @@ export function GeneralTab({
     ops_phone_24_7: carrier?.ops_phone_24_7 || '',
     finance_email: carrier?.finance_email || '',
   })
-
-  // Get organization ID
-  useEffect(() => {
-    async function getOrgId() {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        if (!user) return
-
-        const { data: member } = await supabase
-          .from('organization_members')
-          .select('org_id')
-          .eq('user_id', user.id)
-          .single()
-
-        if (member) {
-          setOrgId(member.org_id)
-        }
-      } catch (err) {
-        console.error('Error getting organization:', err)
-      }
-    }
-
-    getOrgId()
-  }, [])
 
   // Generate carrier_id if creating
   useEffect(() => {
@@ -90,7 +66,9 @@ export function GeneralTab({
 
   const handleSave = async () => {
     if (!orgId) {
-      alert('No se pudo obtener la organización')
+      alert(
+        'No se pudo obtener la organización. Por favor, selecciona una organización primero.'
+      )
       return
     }
 
@@ -185,6 +163,30 @@ export function GeneralTab({
     }
   }
 
+  // Show loading state while org is loading
+  if (orgLoading) {
+    return (
+      <div className='flex items-center justify-center py-12'>
+        <div className='inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent'></div>
+        <span className='ml-2 text-sm text-gray-600'>Cargando...</span>
+      </div>
+    )
+  }
+
+  // Show message if no org selected
+  if (!orgId) {
+    return (
+      <div className='flex items-center justify-center py-12'>
+        <div className='text-center'>
+          <p className='text-gray-500 mb-2'>No hay organización seleccionada</p>
+          <p className='text-sm text-gray-400'>
+            Selecciona una organización en Configuración para continuar
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className='space-y-6'>
       {/* Información de Identificación */}
@@ -222,16 +224,27 @@ export function GeneralTab({
             label='Estado'
             id='is_active'
             required
-            value={formData.is_active ? 'active' : 'inactive'}
+            value={formData.is_active ? 'true' : 'false'}
             onChange={(e) =>
-              handleChange('is_active', e.target.value === 'active')
+              handleChange('is_active', e.target.value === 'true')
             }
             options={[
-              { value: 'active', label: 'Activo' },
-              { value: 'inactive', label: 'Inactivo' },
+              { value: 'true', label: 'Activo' },
+              { value: 'false', label: 'Inactivo' },
             ]}
           />
+        </div>
+      </Card>
 
+      {/* Información Comercial */}
+      <Card className='p-6'>
+        <div className='mb-5'>
+          <h3 className='text-sm font-semibold text-gray-900 uppercase tracking-wide'>
+            Información Comercial
+          </h3>
+        </div>
+
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-5'>
           <InputField
             label='Nombre Comercial'
             id='commercial_name'
@@ -247,16 +260,16 @@ export function GeneralTab({
             required
             value={formData.legal_name}
             onChange={(e) => handleChange('legal_name', e.target.value)}
-            placeholder='Nombre legal de la empresa'
+            placeholder='Ej: ColdChain Express S.A.'
           />
 
           <InputField
-            label='ID Tributario'
+            label='NIT/RUC'
             id='tax_id'
             required
             value={formData.tax_id}
             onChange={(e) => handleChange('tax_id', e.target.value)}
-            placeholder='Número fiscal'
+            placeholder='Ej: 123456789'
           />
 
           <InputField
@@ -267,7 +280,7 @@ export function GeneralTab({
             onChange={(e) =>
               handleChange('legal_representative', e.target.value)
             }
-            placeholder='Nombre completo del representante'
+            placeholder='Ej: Juan Pérez'
           />
         </div>
       </Card>
@@ -281,38 +294,34 @@ export function GeneralTab({
         </div>
 
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5'>
-          <SelectField
-            label='País Base'
+          <InputField
+            label='País'
             id='country'
             required
             value={formData.country}
             onChange={(e) => handleChange('country', e.target.value)}
-            options={[
-              { value: 'Bolivia', label: 'Bolivia' },
-              { value: 'Perú', label: 'Perú' },
-              { value: 'Chile', label: 'Chile' },
-              { value: 'Argentina', label: 'Argentina' },
-              { value: 'Colombia', label: 'Colombia' },
-            ]}
+            placeholder='Ej: Bolivia'
           />
 
           <InputField
-            label='Ciudad / Departamento'
+            label='Ciudad'
             id='city'
             required
             value={formData.city}
             onChange={(e) => handleChange('city', e.target.value)}
-            placeholder='Ej: La Paz'
+            placeholder='Ej: Santa Cruz'
           />
 
-          <InputField
-            label='Dirección Fiscal'
-            id='fiscal_address'
-            required
-            value={formData.fiscal_address}
-            onChange={(e) => handleChange('fiscal_address', e.target.value)}
-            placeholder='Dirección completa'
-          />
+          <div className='md:col-span-2 lg:col-span-1'>
+            <InputField
+              label='Dirección Fiscal'
+              id='fiscal_address'
+              required
+              value={formData.fiscal_address}
+              onChange={(e) => handleChange('fiscal_address', e.target.value)}
+              placeholder='Ej: Av. Principal #123'
+            />
+          </div>
         </div>
       </Card>
 
@@ -320,49 +329,46 @@ export function GeneralTab({
       <Card className='p-6'>
         <div className='mb-5'>
           <h3 className='text-sm font-semibold text-gray-900 uppercase tracking-wide'>
-            Contacto
+            Información de Contacto
           </h3>
         </div>
 
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5'>
           <InputField
-            label='Nombre de Contacto (Operaciones)'
+            label='Nombre de Contacto'
             id='contact_name'
             required
             value={formData.contact_name}
             onChange={(e) => handleChange('contact_name', e.target.value)}
-            placeholder='Nombre completo'
+            placeholder='Ej: María López'
           />
 
           <InputField
-            label='Teléfono'
+            label='Teléfono de Contacto'
             id='contact_phone'
-            type='tel'
             required
             value={formData.contact_phone}
             onChange={(e) => handleChange('contact_phone', e.target.value)}
-            placeholder='(555) 000-0000'
+            placeholder='Ej: +591 70000000'
           />
 
           <InputField
-            label='Email'
+            label='Email de Contacto'
             id='contact_email'
-            type='email'
             required
+            type='email'
             value={formData.contact_email}
             onChange={(e) => handleChange('contact_email', e.target.value)}
-            placeholder='ops@empresa.com'
+            placeholder='Ej: contacto@empresa.com'
           />
 
           <InputField
-            label='Teléfono 24/7'
+            label='Teléfono Operaciones 24/7'
             id='ops_phone_24_7'
-            type='tel'
             required
             value={formData.ops_phone_24_7}
             onChange={(e) => handleChange('ops_phone_24_7', e.target.value)}
-            highlight='critical'
-            placeholder='Línea de emergencia operativa'
+            placeholder='Ej: +591 70000001'
           />
 
           <InputField
@@ -371,17 +377,17 @@ export function GeneralTab({
             type='email'
             value={formData.finance_email}
             onChange={(e) => handleChange('finance_email', e.target.value)}
-            placeholder='finanzas@empresa.com'
+            placeholder='Ej: finanzas@empresa.com'
           />
         </div>
       </Card>
 
-      {/* Botones de Acción */}
+      {/* Actions */}
       <FormActions
         onCancel={handleCancel}
         onSave={handleSave}
+        saving={saving}
         saveLabel={isCreating ? 'Crear Transportista' : 'Guardar Cambios'}
-        disabled={saving}
       />
     </div>
   )

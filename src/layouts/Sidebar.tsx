@@ -11,8 +11,11 @@ import {
   Menu,
   Snowflake,
   UserCircle,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { useAuth } from '../lib/auth-context'
+import { useNavigate } from 'react-router-dom'
 
 interface SidebarProps {
   activeView: string
@@ -27,6 +30,9 @@ export function Sidebar({
   collapsed,
   onToggle,
 }: SidebarProps) {
+  const { signOut } = useAuth()
+  const navigate = useNavigate()
+
   const menuItems = [
     { id: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: '/dispatch', icon: Package2, label: 'Despacho' },
@@ -42,6 +48,15 @@ export function Sidebar({
     { id: '/settings', icon: Settings, label: 'Settings' },
     { id: '/profile', icon: UserCircle, label: 'Perfil de Usuario' },
   ]
+
+  const handleLogout = async () => {
+    try {
+      await signOut()
+      navigate('/login')
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error)
+    }
+  }
 
   return (
     <div
@@ -130,6 +145,16 @@ export function Sidebar({
             {!collapsed && <span className='text-sm'>{item.label}</span>}
           </button>
         ))}
+
+        {/* Botón de Cerrar Sesión */}
+        <button
+          onClick={handleLogout}
+          className='w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all relative group text-gray-400 hover:bg-gray-700/20 hover:text-white'
+          title={collapsed ? 'Cerrar Sesión' : undefined}
+        >
+          <LogOut className='w-5 h-5 shrink-0' />
+          {!collapsed && <span className='text-sm'>Cerrar Sesión</span>}
+        </button>
       </nav>
     </div>
   )

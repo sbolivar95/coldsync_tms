@@ -60,6 +60,7 @@ import type {
   Product as DBProduct,
   ThermalProfile as DBThermalProfile,
 } from '../types/database.types'
+import { clearSeedData, seedDatabase } from '@/services/seed'
 
 // Extended Product type that includes thermal profile information for display
 interface ProductWithProfiles extends DBProduct {
@@ -1347,15 +1348,25 @@ export const Settings = forwardRef<SettingsRef, {}>((_, ref) => {
   // RENDER
   // ============================================================================
 
+  async function handleSeed() {
+    const result = await seedDatabase(orgId!)
+    console.log(result)
+  }
+
+  async function handleDeleteSeed() {
+    await clearSeedData(orgId!)
+  }
+
   return (
     <div className='flex flex-col h-full'>
+      {/* <button onClick={() => handleSeed()}>Seed Test Data</button>
+      <button onClick={() => handleDeleteSeed()}>Delete Test Data</button> */}
       <PageHeader
         tabs={getTabs()}
         showSearch
         searchPlaceholder={getSearchPlaceholder()}
         filters={getFiltersForTab()}
       />
-
       {/* Error message */}
       {error && (
         <div className='mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-md'>
@@ -1368,7 +1379,6 @@ export const Settings = forwardRef<SettingsRef, {}>((_, ref) => {
           </button>
         </div>
       )}
-
       {/* Loading state */}
       {loading && (
         <div className='flex items-center justify-center py-8'>
@@ -1376,7 +1386,6 @@ export const Settings = forwardRef<SettingsRef, {}>((_, ref) => {
           <span className='ml-2 text-sm text-gray-600'>Cargando...</span>
         </div>
       )}
-
       {activeTab === 'organizaciones' && isPlatformAdmin && !loading && (
         <DataTable
           data={displayOrganizations}
@@ -1388,7 +1397,6 @@ export const Settings = forwardRef<SettingsRef, {}>((_, ref) => {
           emptyMessage='No hay organizaciones para mostrar'
         />
       )}
-
       {activeTab === 'productos' && !loading && orgId && (
         <DataTable
           data={displayProducts}
@@ -1400,7 +1408,6 @@ export const Settings = forwardRef<SettingsRef, {}>((_, ref) => {
           emptyMessage='No hay productos para mostrar'
         />
       )}
-
       {activeTab === 'usuarios' && !loading && orgId && (
         <DataTable
           data={displayUsers}
@@ -1412,7 +1419,6 @@ export const Settings = forwardRef<SettingsRef, {}>((_, ref) => {
           emptyMessage='No hay usuarios para mostrar'
         />
       )}
-
       {activeTab === 'perfil-termico' && !loading && orgId && (
         <DataTable
           data={displayThermalProfiles}
@@ -1424,7 +1430,6 @@ export const Settings = forwardRef<SettingsRef, {}>((_, ref) => {
           emptyMessage='No hay perfiles térmicos para mostrar'
         />
       )}
-
       <ThermalProfileDialog
         open={thermalProfileDialogOpen}
         onClose={() => {
@@ -1434,7 +1439,6 @@ export const Settings = forwardRef<SettingsRef, {}>((_, ref) => {
         profile={selectedThermalProfile}
         onSave={handleSaveThermalProfile}
       />
-
       <ProductDialog
         open={productDialogOpen}
         onClose={() => {
@@ -1445,7 +1449,6 @@ export const Settings = forwardRef<SettingsRef, {}>((_, ref) => {
         thermalProfiles={thermalProfilesForDialog}
         onSave={handleSaveProduct}
       />
-
       <UserDialog
         open={userDialogOpen}
         onClose={() => {
@@ -1457,7 +1460,6 @@ export const Settings = forwardRef<SettingsRef, {}>((_, ref) => {
         onSave={handleSaveUser}
         onCreateInviteCode={handleCreateInviteCode}
       />
-
       <OrganizationDialog
         open={organizationDialogOpen}
         onClose={() => {

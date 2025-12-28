@@ -6,65 +6,29 @@ import { useMemo, useEffect, useState } from 'react'
 import { vehiclesService } from '../../../../services/vehicles.service'
 import { carriersService } from '../../../../services/carriers.service'
 import type { Vehicle } from '../../../../types/database.types'
-import { useOrganization } from '@/hooks/useOrganization'
+import { useOrganization } from '../../../../hooks/useOrganization'
 
 interface VehiclesListProps {
   onSelectItem: (item: Vehicle, type: 'vehiculo') => void
-  transportistaNombre: string
+  transportistaNombre?: string
   searchTerm?: string
   onCountChange?: (count: number) => void
 }
 
 export function VehiclesList({
   onSelectItem,
-  transportistaNombre,
+  transportistaNombre = '',
   searchTerm = '',
   onCountChange,
 }: VehiclesListProps) {
-  const { orgId } = useOrganization()
+  const { orgId, loading: orgLoading } = useOrganization()
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(true)
-  const [carrierId, setCarrierId] = useState<number | null>(null)
 
-  // 1) Resolve carrierId from carrier name (if provided)
+  // Load vehicles filtered by carrier
   useEffect(() => {
-    if (!orgId) return
-
-    // If parent passes empty string or undefined-ish, treat as no filter
-    if (!transportistaNombre?.trim()) {
-      setCarrierId(null)
-      return
-    }
-
-    let cancelled = false
-
-    async function getCarrierId() {
-      try {
-        const carriers = await carriersService.search(
-          orgId!,
-          transportistaNombre
-        )
-        const carrier = carriers.find(
-          (c) => c.commercial_name === transportistaNombre
-        )
-        if (!cancelled) setCarrierId(carrier?.id ?? null)
-      } catch (err) {
-        console.error('Error finding carrier:', err)
-        if (!cancelled) setCarrierId(null)
-      }
-    }
-
-    getCarrierId()
-
-    return () => {
-      cancelled = true
-    }
-  }, [orgId, transportistaNombre])
-
-  // 2) Load vehicles (server-filtered by carrierId if present)
-  useEffect(() => {
-    if (!orgId) return
+    if (!orgId || orgLoading) return
 
     let cancelled = false
 
@@ -72,13 +36,26 @@ export function VehiclesList({
       try {
         setLoading(true)
 
-        // ✅ Correct: pass carrierId only if it exists
-        const data = await vehiclesService.getAll(
-          orgId!,
-          carrierId ?? undefined
-        )
+        // If carrier name provided, find carrier ID first
+        let carrierId: number | undefined = undefined
 
-        if (!cancelled) setVehicles(data)
+        if (transportistaNombre?.trim()) {
+          const carriers = await carriersService.search(
+            orgId!,
+            transportistaNombre
+          )
+          const carrier = carriers.find(
+            (c) => c.commercial_name === transportistaNombre
+          )
+          carrierId = carrier?.id
+        }
+
+        // Load vehicles (with or without carrier filter)
+        const data = await vehiclesService.getAll(orgId!, carrierId)
+
+        if (!cancelled) {
+          setVehicles(data)
+        }
       } catch (err) {
         console.error('Error loading vehicles:', err)
         if (!cancelled) setVehicles([])
@@ -92,9 +69,9 @@ export function VehiclesList({
     return () => {
       cancelled = true
     }
-  }, [orgId, carrierId])
+  }, [orgId, orgLoading, transportistaNombre])
 
-  // 3) Client-side search filter (for PageHeader search)
+  // Client-side search filter (for PageHeader search)
   const filteredVehicles = useMemo(() => {
     const q = searchTerm.trim().toLowerCase()
     if (!q) return vehicles
@@ -114,7 +91,7 @@ export function VehiclesList({
     })
   }, [vehicles, searchTerm])
 
-  // 4) Report count to parent for the badge
+  // Report count to parent for the badge
   useEffect(() => {
     onCountChange?.(filteredVehicles.length)
   }, [filteredVehicles.length, onCountChange])
@@ -132,8 +109,19 @@ export function VehiclesList({
     try {
       await vehiclesService.delete(vehicle.id, orgId)
 
-      // ✅ Reload with SAME filter
-      const data = await vehiclesService.getAll(orgId, carrierId ?? undefined)
+      // Reload vehicles with same filter
+      let carrierId: number | undefined = undefined
+      if (transportistaNombre?.trim()) {
+        const carriers = await carriersService.search(
+          orgId,
+          transportistaNombre
+        )
+        const carrier = carriers.find(
+          (c) => c.commercial_name === transportistaNombre
+        )
+        carrierId = carrier?.id
+      }
+      const data = await vehiclesService.getAll(orgId, carrierId)
       setVehicles(data)
     } catch (err) {
       console.error('Error deleting vehicle:', err)
@@ -141,10 +129,34 @@ export function VehiclesList({
     }
   }
 
-  // Columnas para Vehículos
+  // Helper to get status badge style
+  const getStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      ACTIVE: 'bg-green-100 text-green-700 hover:bg-green-100',
+      IN_MAINTENANCE: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100',
+      IN_TRANSIT: 'bg-blue-100 text-blue-700 hover:bg-blue-100',
+      IN_SERVICE: 'bg-purple-100 text-purple-700 hover:bg-purple-100',
+      OUT_OF_SERVICE: 'bg-red-100 text-red-700 hover:bg-red-100',
+      RETIRED: 'bg-gray-300 text-gray-700 hover:bg-gray-300',
+    }
+    const labels: Record<string, string> = {
+      ACTIVE: 'Activo',
+      IN_MAINTENANCE: 'En Mantenimiento',
+      IN_TRANSIT: 'En Tránsito',
+      IN_SERVICE: 'En Servicio',
+      OUT_OF_SERVICE: 'Fuera de Servicio',
+      RETIRED: 'Retirado',
+    }
+    return {
+      style: styles[status] || 'bg-gray-200 text-gray-700 hover:bg-gray-200',
+      label: labels[status] || status,
+    }
+  }
+
+  // Columns for Vehicles
   const vehicleColumns: DataTableColumn<Vehicle>[] = [
     {
-      key: 'unit_code', // ✅ use real field keys if your DataTable expects it
+      key: 'unidad',
       header: 'Unidad',
       render: (vehicle) => (
         <div className='flex flex-col gap-0.5'>
@@ -160,7 +172,17 @@ export function VehiclesList({
       ),
     },
     {
-      key: 'vehicle_type',
+      key: 'placa',
+      header: 'Placa',
+      render: (vehicle) => (
+        <span className='text-xs text-gray-900 font-medium'>
+          {vehicle.plate}
+        </span>
+      ),
+      width: 'w-24',
+    },
+    {
+      key: 'tipo',
       header: 'Tipo',
       render: (vehicle) => (
         <Badge
@@ -172,122 +194,94 @@ export function VehiclesList({
       ),
     },
     {
-      key: 'brand',
-      header: 'Marca / Modelo',
+      key: 'marca',
+      header: 'Marca/Modelo',
       render: (vehicle) => (
         <div className='flex flex-col gap-0.5'>
           <span className='text-xs text-gray-900'>{vehicle.brand}</span>
-          <span className='text-xs text-gray-500'>{vehicle.model}</span>
+          <span className='text-xs text-gray-500'>
+            {vehicle.model} ({vehicle.year})
+          </span>
         </div>
       ),
     },
     {
-      key: 'year',
-      header: 'Año',
-      render: (vehicle) => (
-        <span className='text-xs text-gray-900'>{vehicle.year}</span>
-      ),
-    },
-    {
-      key: 'plate',
-      header: 'Placa',
-      render: (vehicle) => (
-        <span className='text-xs text-gray-900'>{vehicle.plate}</span>
-      ),
-    },
-    {
-      key: 'odometer_value',
+      key: 'odometro',
       header: 'Odómetro',
       render: (vehicle) => (
         <span className='text-xs text-gray-900'>
-          {vehicle.odometer_value.toLocaleString()} {vehicle.odometer_unit}
+          {vehicle.odometer_value?.toLocaleString()} {vehicle.odometer_unit}
         </span>
       ),
+      width: 'w-28',
     },
     {
-      key: 'operational_status',
+      key: 'estado',
       header: 'Estado',
-      render: (vehicle) => (
-        <Badge
-          variant='default'
-          className={
-            vehicle.operational_status === 'ACTIVE'
-              ? 'bg-green-100 text-green-700 hover:bg-green-100 text-xs'
-              : vehicle.operational_status === 'IN_MAINTENANCE'
-              ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100 text-xs'
-              : 'bg-red-100 text-red-700 hover:bg-red-100 text-xs'
-          }
-        >
-          {vehicle.operational_status === 'ACTIVE'
-            ? 'Activo'
-            : vehicle.operational_status === 'IN_MAINTENANCE'
-            ? 'Mantenimiento'
-            : vehicle.operational_status === 'IN_SERVICE'
-            ? 'En Servicio'
-            : vehicle.operational_status === 'OUT_OF_SERVICE'
-            ? 'Fuera de Servicio'
-            : vehicle.operational_status === 'RETIRED'
-            ? 'Retirado'
-            : vehicle.operational_status}
-        </Badge>
-      ),
+      render: (vehicle) => {
+        const { style, label } = getStatusBadge(vehicle.operational_status)
+        return (
+          <Badge
+            variant='default'
+            className={`${style} text-xs`}
+          >
+            {label}
+          </Badge>
+        )
+      },
+      width: 'w-32',
     },
   ]
 
-  const actions = [
+  // Row actions
+  const vehicleActions = [
     {
       icon: <Pencil className='w-3.5 h-3.5 text-gray-600' />,
-      title: 'Editar',
       onClick: (vehicle: Vehicle) => onSelectItem(vehicle, 'vehiculo'),
+      title: 'Editar',
     },
     {
       icon: <Trash2 className='w-3.5 h-3.5 text-red-600' />,
-      title: 'Eliminar',
       onClick: handleDelete,
-    },
-  ]
-
-  const bulkActions = [
-    {
-      icon: <Trash2 className='w-4 h-4' />,
-      label: 'Eliminar',
       variant: 'destructive' as const,
-      onClick: async (selectedIds: string[]) => {
-        if (!orgId) return
-        if (
-          !confirm(`¿Está seguro de eliminar ${selectedIds.length} vehículos?`)
-        )
-          return
-
-        try {
-          await Promise.all(
-            selectedIds.map((id) => vehiclesService.delete(id, orgId))
-          )
-
-          // ✅ Reload with SAME filter
-          const data = await vehiclesService.getAll(
-            orgId,
-            carrierId ?? undefined
-          )
-          setVehicles(data)
-        } catch (err) {
-          console.error('Error deleting vehicles:', err)
-          alert('Error al eliminar los vehículos')
-        }
-      },
+      title: 'Eliminar',
     },
   ]
+
+  // Show loading state
+  if (orgLoading || loading) {
+    return (
+      <div className='flex items-center justify-center py-12'>
+        <div className='inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent'></div>
+        <span className='ml-2 text-sm text-gray-600'>
+          Cargando vehículos...
+        </span>
+      </div>
+    )
+  }
+
+  // Show message if no org selected
+  if (!orgId) {
+    return (
+      <div className='flex items-center justify-center py-12'>
+        <div className='text-center'>
+          <p className='text-gray-500 mb-2'>No hay organización seleccionada</p>
+          <p className='text-sm text-gray-400'>
+            Selecciona una organización en Configuración para ver los vehículos
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <DataTable
-      data={filteredVehicles} // ✅ search-filtered list
+      data={filteredVehicles}
       columns={vehicleColumns}
-      getRowId={(vehicle) => vehicle.id}
-      actions={actions}
-      bulkActions={bulkActions}
+      getRowId={(v) => v.id}
+      actions={vehicleActions}
       itemsPerPage={10}
-      emptyMessage={loading ? 'Cargando...' : 'No hay vehículos disponibles'}
-      totalLabel='vehículos'
+      emptyMessage='No hay vehículos para mostrar'
     />
   )
 }

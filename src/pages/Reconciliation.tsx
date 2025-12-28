@@ -465,7 +465,7 @@ export function Reconciliation() {
   const bulkActions = [
     {
       icon: <Trash2 className="w-4 h-4" />,
-      label: "Eliminar seleccionados",
+      label: "Eliminar",
       variant: "destructive" as const,
       onClick: (selectedIds: string[]) => {
         console.log("Delete conciliaciones:", selectedIds);

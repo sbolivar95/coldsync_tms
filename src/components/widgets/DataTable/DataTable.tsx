@@ -8,7 +8,6 @@ export function DataTable<T>({
   data,
   columns,
   getRowId,
-  onRowClick,
   actions = [],
   bulkActions = [],
   itemsPerPage = 10,

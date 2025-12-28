@@ -105,7 +105,7 @@ export function VehicleDropZone({
 
       {/* Columna de Unidad (Sticky Left - Fija horizontalmente) */}
       <div
-        className={`sticky left-0 z-30 bg-white border-r border-gray-300 transition-all cursor-pointer flex flex-col justify-center relative group-hover:bg-[#e5edff]`}
+        className={`sticky left-0 z-30 bg-white border-r border-gray-300 transition-all cursor-pointer flex flex-col justify-center group-hover:bg-[#e5edff]`}
         style={{
           width: "260px",
           padding: "0 12px",

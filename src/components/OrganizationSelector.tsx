@@ -5,6 +5,7 @@ import {
   organizationsService,
   type Organization,
 } from '@/services/organizations.service'
+import { dispatchOrgChangeEvent } from '@/hooks/useOrganization'
 
 interface OrganizationSelectorProps {
   variant?: 'header' | 'inline'
@@ -48,6 +49,9 @@ export function OrganizationSelector({
     // Save to localStorage
     localStorage.setItem('platform_admin_selected_org', orgId)
 
+    // Dispatch event to notify all useOrganization hooks
+    dispatchOrgChangeEvent()
+
     // Refresh user data to pick up the new org
     await refreshUserData()
 
@@ -58,6 +62,9 @@ export function OrganizationSelector({
   const handleClearSelection = async () => {
     // Remove from localStorage
     localStorage.removeItem('platform_admin_selected_org')
+
+    // Dispatch event to notify all useOrganization hooks
+    dispatchOrgChangeEvent()
 
     // Refresh user data
     await refreshUserData()

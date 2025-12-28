@@ -1,6 +1,6 @@
 import { PageHeader } from "../layouts/PageHeader";
 import { Button } from "../components/ui/Button";
-import { Filter, Calendar, ChevronDown, ArrowRight, Trash2, Pencil } from "lucide-react";
+import { Filter, ArrowRight, Trash2, Pencil } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "../components/ui/Badge";
 import { DataTable } from "../components/widgets/DataTable/DataTable";
@@ -132,7 +132,7 @@ export function Routes() {
 
   const routesBulkActions: DataTableBulkAction[] = [
     {
-      label: "Eliminar seleccionadas",
+      label: "Eliminar",
       icon: <Trash2 className="w-4 h-4" />,
       onClick: (selectedIds) => console.log("Delete routes:", selectedIds),
       variant: "destructive"

@@ -10,7 +10,7 @@ export function ControlTowerListPage() {
     const { unitId } = useParams();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const activeTab = searchParams.get("tab") || "todos";
+    const activeTab = searchParams.get("tab") || "live-tracking";
     const searchQuery = searchParams.get("q") || "";
 
     const setActiveTab = (tab: string) => {
@@ -29,6 +29,12 @@ export function ControlTowerListPage() {
         setSearchParams(newParams);
     };
 
+    const clearFilters = () => {
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete("q");
+        setSearchParams(newParams);
+    };
+
     const controlTower = useControlTower({
         activeTab,
         searchQuery,
@@ -42,60 +48,39 @@ export function ControlTowerListPage() {
             <PageHeader
                 tabs={[
                     {
-                        id: "todos",
-                        label: "Todos",
-                        active: activeTab === "todos",
-                        onClick: () => setActiveTab("todos"),
-                        badge: counts.todos
+                        id: "live-tracking",
+                        label: "Tracking",
+                        active: activeTab === "live-tracking",
+                        onClick: () => setActiveTab("live-tracking"),
+                        badge: counts.liveTracking
                     },
                     {
-                        id: "programado",
-                        label: "Programado",
-                        active: activeTab === "programado",
-                        onClick: () => setActiveTab("programado"),
-                        badge: counts.programado
+                        id: "active-orders",
+                        label: "En Ejecución",
+                        active: activeTab === "active-orders",
+                        onClick: () => setActiveTab("active-orders"),
+                        badge: counts.activeOrders
                     },
                     {
-                        id: "excursion-termica",
-                        label: "Excursión Térmica",
-                        active: activeTab === "excursion-termica",
-                        onClick: () => setActiveTab("excursion-termica"),
-                        badge: counts.excursionTermica
+                        id: "in-transit",
+                        label: "En Tránsito",
+                        active: activeTab === "in-transit",
+                        onClick: () => setActiveTab("in-transit"),
+                        badge: counts.inTransit
                     },
                     {
-                        id: "en-origen",
-                        label: "En Origen",
-                        active: activeTab === "en-origen",
-                        onClick: () => setActiveTab("en-origen"),
-                        badge: counts.enOrigen
-                    },
-                    {
-                        id: "en-ruta",
-                        label: "En Ruta",
-                        active: activeTab === "en-ruta",
-                        onClick: () => setActiveTab("en-ruta"),
-                        badge: counts.enRuta
-                    },
-                    {
-                        id: "en-destino",
+                        id: "at-destination",
                         label: "En Destino",
-                        active: activeTab === "en-destino",
-                        onClick: () => setActiveTab("en-destino"),
-                        badge: counts.enDestino
+                        active: activeTab === "at-destination",
+                        onClick: () => setActiveTab("at-destination"),
+                        badge: counts.atDestination
                     },
                     {
-                        id: "retrasado",
-                        label: "Retrasado",
-                        active: activeTab === "retrasado",
-                        onClick: () => setActiveTab("retrasado"),
-                        badge: counts.retrasado
-                    },
-                    {
-                        id: "finalizado",
-                        label: "Finalizado",
-                        active: activeTab === "finalizado",
-                        onClick: () => setActiveTab("finalizado"),
-                        badge: counts.finalizado
+                        id: "delivered",
+                        label: "Completadas",
+                        active: activeTab === "delivered",
+                        onClick: () => setActiveTab("delivered"),
+                        badge: counts.delivered
                     },
                 ]}
                 showSearch
@@ -122,7 +107,13 @@ export function ControlTowerListPage() {
             />
 
             <div className="flex-1 overflow-hidden">
-                <TrackingView controlTower={controlTower} />
+                <TrackingView
+                    controlTower={controlTower}
+                    activeTab={activeTab}
+                    hasFilters={Boolean(searchQuery)}
+                    onClearFilters={clearFilters}
+                    onGoToTracking={() => setActiveTab("live-tracking")}
+                />
             </div>
         </div>
     );

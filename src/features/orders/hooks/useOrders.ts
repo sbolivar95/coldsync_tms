@@ -124,17 +124,17 @@ export function useOrders({
     // Filter orders by tab (category)
     const filteredOrders = useMemo(() => {
         return orders.filter((order) => {
-            const status = order.status;
+            const substatus = order.substatus;
             const category = activeTab as CarrierOrderCategory;
             
             if (category === "solicitudes") {
-                return CARRIER_ORDER_STATUSES.SOLICITUDES.includes(status as any);
+                return CARRIER_ORDER_STATUSES.SOLICITUDES.includes(substatus);
             }
             if (category === "compromisos") {
-                return CARRIER_ORDER_STATUSES.COMPROMISOS.includes(status as any);
+                return CARRIER_ORDER_STATUSES.COMPROMISOS.includes(substatus);
             }
             if (category === "historial") {
-                return CARRIER_ORDER_STATUSES.HISTORIAL.includes(status as any);
+                return CARRIER_ORDER_STATUSES.HISTORIAL.includes(substatus);
             }
             return true;
         });
@@ -168,16 +168,16 @@ export function useOrders({
                             return true;
                     }
                 } else if (activeTab === "historial") {
-                    const status = order.status;
+                    const substatus = order.substatus;
                     switch (contextualFilter) {
                         case "rejected":
-                            return status === "REJECTED";
+                            return substatus === "REJECTED";
                         case "expired":
-                            return false; // No explicit EXPIRED status in DB
+                            return substatus === "EXPIRED";
                         case "observed":
-                            return status === "OBSERVANCE";
+                            return substatus === "OBSERVED";
                         case "dispatched":
-                            return status === "DISPATCHED" || status === "COMPLETED";
+                            return substatus === "DISPATCHED" || substatus === "COMPLETED";
                         default:
                             return true;
                     }
@@ -213,13 +213,13 @@ export function useOrders({
     const counts = useMemo(() => {
         return {
             solicitudes: orders.filter(o => 
-                CARRIER_ORDER_STATUSES.SOLICITUDES.includes(o.status as any)
+                CARRIER_ORDER_STATUSES.SOLICITUDES.includes(o.substatus)
             ).length,
             compromisos: orders.filter(o => 
-                CARRIER_ORDER_STATUSES.COMPROMISOS.includes(o.status as any)
+                CARRIER_ORDER_STATUSES.COMPROMISOS.includes(o.substatus)
             ).length,
             historial: orders.filter(o => 
-                CARRIER_ORDER_STATUSES.HISTORIAL.includes(o.status as any)
+                CARRIER_ORDER_STATUSES.HISTORIAL.includes(o.substatus)
             ).length,
         };
     }, [orders]);

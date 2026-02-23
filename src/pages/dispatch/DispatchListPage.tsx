@@ -19,7 +19,7 @@ import { useCarrierAllocations } from '@/features/dispatch/hooks/useCarrierAlloc
 import { lanesService } from '@/services/database/lanes.service'
 import { BatchAssignmentResultsDialog } from '@/components/widgets/BatchAssignmentResultsDialog'
 import { DispatchBoard } from '@/features/dispatch/DispatchBoard'
-import type { ViewDensityMode } from '@/features/dispatch/components/DispatchViewControls'
+import type { ViewDensityMode, ListHorizonPreset } from '@/features/dispatch/components/DispatchViewControlTypes'
 import type { LaneWithStops } from '@/features/dispatch/utils/laneMatcher'
 import { DispatchSendDialog } from '@/features/dispatch/components/dialogs/DispatchSendDialog'
 import { DispatchCancelDialog } from '@/features/dispatch/components/dialogs/DispatchCancelDialog'
@@ -73,6 +73,7 @@ export const DispatchListPage = forwardRef<DispatchRef, {}>((_, ref) => {
   const [lanesWithStops, setLanesWithStops] = useState<LaneWithStops[]>([])
   const [isLoadingLanes] = useState(false)
   const [viewMode, setViewMode] = useState<ViewDensityMode>('normal')
+  const [listHorizonPreset, setListHorizonPreset] = useState<ListHorizonPreset>('OPERATIONS')
   const [drawerInitialView, setDrawerInitialView] = useState<'details' | 'cancel'>('details')
   const [sendDialogOpen, setSendDialogOpen] = useState(false)
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
@@ -241,6 +242,8 @@ export const DispatchListPage = forwardRef<DispatchRef, {}>((_, ref) => {
         setStartDate={setStartDate}
         viewMode={viewMode}
         setViewMode={setViewMode}
+        listHorizonPreset={listHorizonPreset}
+        setListHorizonPreset={setListHorizonPreset}
         displayMode={displayMode}
         setDisplayMode={handleDisplayModeChange}
         selectedOrders={selectedOrders}

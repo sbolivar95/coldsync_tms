@@ -73,7 +73,7 @@ export function DispatchDrawer({
       // Reset to initial view
       setDrawerView(initialView);
       setActiveTab('detalles');
-      
+
       // Set fleetset IDs
       setOriginalFleetsetId(order.fleet_set_id ?? null);
       setSelectedFleetsetId(order.fleet_set_id ?? null);
@@ -99,11 +99,11 @@ export function DispatchDrawer({
       order
         ? getDispatchStateDisplay(order, tenderCreatedAt, decisionTimestamp)
         : {
-            label: "Sin Asignar",
-            timeInfo: "",
-            urgency: 'normal' as 'normal' | 'high' | 'critical',
-            dotColor: '#3b82f6',
-          },
+          label: "Sin Asignar",
+          timeInfo: "",
+          urgency: 'normal' as 'normal' | 'high' | 'critical',
+          dotColor: '#3b82f6',
+        },
     [order, tenderCreatedAt, decisionTimestamp]
   );
 
@@ -185,7 +185,7 @@ export function DispatchDrawer({
     // Handle view swapping
     if (drawerView === 'fleetset-selection') {
       if (!order) return null;
-      
+
       return (
         <DispatchFleetsetSelectionView
           order={order}
@@ -199,7 +199,7 @@ export function DispatchDrawer({
 
     if (drawerView === 'cancel') {
       if (!order) return null;
-      
+
       return (
         <CancelView
           reasons={cancellationReasons}
@@ -225,7 +225,7 @@ export function DispatchDrawer({
           onChangeFleetset={handleChangeFleetset}
           onUpdateOrder={onUpdateOrder}
         />;
-        
+
       case 'historial':
         if (!order) {
           return (
@@ -234,7 +234,7 @@ export function DispatchDrawer({
             </div>
           );
         }
-        
+
         return <DispatchHistoryTab order={order} />;
       default:
         return null;
@@ -278,9 +278,8 @@ export function DispatchDrawer({
 
           {/* Content */}
           <div
-            className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${
-              drawerView === 'fleetset-selection' || drawerView === 'cancel' ? '' : 'px-6 py-4'
-            }`}
+            className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${drawerView === 'fleetset-selection' || drawerView === 'cancel' ? '' : 'px-6 py-4'
+              }`}
             style={{
               userSelect: 'text',
               WebkitUserSelect: 'text',
@@ -383,7 +382,7 @@ export function DispatchDrawer({
                     Reasignar Flota
                   </PrimaryButton>
                 </>
-              ) : order?.substatus === 'PROGRAMMED' || order?.substatus === 'DISPATCHED' || order?.substatus === 'AT_ORIGIN' || order?.substatus === 'LOADING' || order?.substatus === 'IN_TRANSIT' || order?.substatus === 'AT_DESTINATION' || order?.substatus === 'DELIVERED' ? (
+              ) : order?.substatus === 'PROGRAMMED' || order?.substatus === 'DISPATCHED' || order?.substatus === 'EN_ROUTE_TO_ORIGIN' || order?.substatus === 'AT_ORIGIN' || order?.substatus === 'LOADING' || order?.substatus === 'IN_TRANSIT' || order?.substatus === 'AT_DESTINATION' || order?.substatus === 'DELIVERED' ? (
                 <span className="w-full text-center text-sm text-gray-500 flex items-center justify-center">
                   Orden en ejecución
                 </span>

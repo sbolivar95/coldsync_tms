@@ -54,14 +54,23 @@ const baseAssignmentSchema = z.object({
 // Note: vehicleType parameter kept for API compatibility but not used in validation
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function createAssignmentSchema(_vehicleType?: string | null) {
-  // Trailer is always optional (Bobtail support for TRACTOR)
-  // Visual warnings are handled in the UI component
-  return baseAssignmentSchema
+  return baseAssignmentSchema.superRefine((data, ctx) => {
+    const vehicleType = (_vehicleType ?? '').toUpperCase()
+    const hasTrailer = Boolean(data.trailer_id && String(data.trailer_id).trim().length > 0)
+
+    // Fleet rule: only TRACTOR can have trailer assignment.
+    if (vehicleType && vehicleType !== 'TRACTOR' && hasTrailer) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['trailer_id'],
+        message: 'Solo un vehículo tipo TRACTOR puede tener remolque asignado',
+      })
+    }
+  })
 }
 
 // Default schema (without vehicle type validation - will be validated in component)
 export const assignmentSchema = baseAssignmentSchema
 
 export type AssignmentFormData = z.infer<typeof baseAssignmentSchema>
-
 

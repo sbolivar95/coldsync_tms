@@ -1,19 +1,19 @@
-import { Circle, AlertTriangle } from "lucide-react";
+import { Circle, TriangleAlert } from "lucide-react";
 import { cn } from "../../../lib/utils";
 
 /**
  * UNIT CARD COMPONENT - ColdSync
  * 
- * Componente reutilizable que replica exactamente la columna izquierda del VehicleDropZone.
- * Muestra la información de una unidad (vehículo) con su estado, ID, trailer, conductor, etc.
+ * Reusable component that replicates the left column of the VehicleDropZone.
+ * Displays unit information (vehicle) with its status, ID, trailer, driver, etc.
  * 
- * Características:
- * - Indicador de estado (círculo)
- * - ID de unidad y trailer
- * - Badge HYB para remolques híbridos
- * - Icono de advertencia para problemas
- * - Nombre del conductor
- * - Hover effects y selección
+ * Features:
+ * - Status indicator (dot)
+ * - Unit and trailer ID
+ * - HYB badge for hybrid trailers
+ * - Warning icon for issues
+ * - Driver name
+ * - Hover effects and selection state
  * 
  * @example
  * ```tsx
@@ -28,36 +28,36 @@ import { cn } from "../../../lib/utils";
 
 export interface UnitCardUnit {
   id: string;
-  unit: string; // ID de la unidad (ej: TRK-1024)
-  trailer?: string; // ID del remolque (ej: RMQ-456)
+  unit: string; // Unit ID (e.g., TRK-1024)
+  trailer?: string; // Trailer ID (e.g., RMQ-456)
   driver: string;
   status: string;
   hasActiveTrip?: boolean;
-  trailerEsHibrido?: boolean;
+  isHybridTrailer?: boolean;
   hasIssue?: boolean;
 }
 
 export interface UnitCardProps {
-  /** Datos de la unidad */
+  /** Unit data */
   unit: UnitCardUnit;
-  /** Función para obtener el color del indicador de estado */
+  /** Function to get status dot color */
   getStatusDotColor: (status: string, hasActiveTrip: boolean) => string;
-  /** Si la unidad está seleccionada */
+  /** If the unit is selected */
   isSelected?: boolean;
-  /** Callback cuando se hace click en la tarjeta */
+  /** Callback on card click */
   onClick?: () => void;
-  /** Ancho de la tarjeta (default: 260px como en VehicleDropZone) */
+  /** Card width (default: 260px like in VehicleDropZone) */
   width?: string | number;
-  /** Clases CSS adicionales */
+  /** Additional CSS classes */
   className?: string;
-  /** Si muestra el hover effect (default: true) */
+  /** If hover effect is shown (default: true) */
   showHover?: boolean;
 }
 
 /**
- * Componente UnitCard
+ * UnitCard Component
  * 
- * Réplica exacta de la columna izquierda del VehicleDropZone como componente reutilizable.
+ * Exact replica of the left column of VehicleDropZone as a reusable component.
  */
 export function UnitCard({
   unit,
@@ -71,25 +71,26 @@ export function UnitCard({
   return (
     <div
       className={cn(
-        "bg-white border-r border-gray-300 transition-all flex flex-col justify-center cursor-pointer",
+        "bg-white transition-all flex flex-col justify-center cursor-pointer relative",
+        "border-l-4", // Always have a border to avoid layout shifts
         showHover && "group",
-        showHover && !isSelected && "hover:bg-[#e5edff]",
-        isSelected && "bg-blue-50 border-l-4 border-l-blue-500",
+        showHover && !isSelected && "hover:bg-primary-light",
+        isSelected ? "bg-blue-50 border-l-blue-500" : "border-l-transparent border-r border-r-gray-300",
         className
       )}
       style={{
         width: typeof width === "number" ? `${width}px` : width,
         padding: "0 12px",
-        minHeight: "84px", // Misma altura que VehicleDropZone
+        minHeight: "84px", // Same height as VehicleDropZone
       }}
       onClick={onClick}
     >
-      {/* Indicador de hover (igual que VehicleDropZone) */}
+      {/* Hover indicator (replicates VehicleDropZone behavior) */}
       {showHover && (
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
       )}
 
-      {/* Info Unidad - Réplica exacta del VehicleDropZone */}
+      {/* Unit Info - Replica of VehicleDropZone */}
       <div className="flex items-center gap-1.5 mb-1">
         <Circle
           className={cn(
@@ -103,8 +104,8 @@ export function UnitCard({
         {unit.trailer && (
           <span className="text-xs text-gray-400 flex items-center gap-1">
             {unit.trailer}
-            {/* Badge HYB para remolques híbridos - inline después del ID */}
-            {unit.trailerEsHibrido && (
+            {/* HYB Badge for hybrid trailers - inline after ID */}
+            {unit.isHybridTrailer && (
               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-hibrido-bg text-hibrido-text">
                 HYB
               </span>
@@ -112,10 +113,11 @@ export function UnitCard({
           </span>
         )}
         {unit.hasIssue && (
-          <AlertTriangle className="w-3 h-3 text-orange-500 ml-auto" />
+          <TriangleAlert className="w-3 h-3 text-orange-500 ml-auto" />
         )}
       </div>
       <div className="text-xs text-gray-600 pl-3.5">{unit.driver}</div>
     </div>
   );
 }
+

@@ -64,6 +64,8 @@ export function HardwareDetail({
       ident: '',
       phone_number: null,
       serial: null,
+      has_can: false,
+      temp_mode: 'NONE',
       notes: null,
       carrier_id: carrierId ? carrierId.toString() : undefined as any,
       assigned_entity_id: null,
@@ -111,6 +113,8 @@ export function HardwareDetail({
         ident: connectionDevice.ident,
         phone_number: connectionDevice.phone_number || null,
         serial: connectionDevice.serial || null,
+        has_can: connectionDevice.has_can ?? false,
+        temp_mode: connectionDevice.temp_mode ?? 'NONE',
         notes: connectionDevice.notes || null,
         carrier_id: connectionDevice.carrier_id ? connectionDevice.carrier_id.toString() : undefined,
         assigned_entity_id: null, // Hardwares don't store assignment directly, it's a virtual form field
@@ -128,6 +132,8 @@ export function HardwareDetail({
           ident: '',
           phone_number: null,
           serial: null,
+          has_can: false,
+          temp_mode: 'NONE',
           notes: null,
           carrier_id: carrierId ? carrierId.toString() : undefined,
           assigned_entity_id: null,
@@ -178,6 +184,8 @@ export function HardwareDetail({
         flespi_device_type_id: data.flespi_device_type_id,
         phone_number: data.phone_number || null,
         serial: data.serial || null,
+        has_can: data.has_can ?? false,
+        temp_mode: data.temp_mode ?? 'NONE',
         notes: data.notes || null,
         tracked_entity_type: data.tracked_entity_type || null
       };

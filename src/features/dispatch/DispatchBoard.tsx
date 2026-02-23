@@ -18,13 +18,19 @@ import { PageHeader } from '@/layouts/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { EntityStatusFilter } from '@/components/ui/EntityStatusFilter'
 import { ChevronRight, Sparkles, Loader2, Send } from 'lucide-react'
-import { DispatchViewControls, type ViewDensityMode, type DisplayMode } from './components/DispatchViewControls'
+import { DispatchViewControls } from './components/DispatchViewControls'
 import { TripCard } from './views/gantt/TripCard'
 import type { DispatchOrderWithRelations } from './hooks/useDispatchOrders'
 import type { FleetSetUnit } from './types'
 import type { CarrierAllocationStatus } from '@/services/database/carrierAllocation.service'
 import { isOrderHybrid } from '@/features/orders/utils/orders-helpers'
 import type { CarrierOrder } from '@/services/database/orders.service'
+import { MONTH_NAMES_LOWER } from './constants'
+import type {
+    ViewDensityMode,
+    DisplayMode,
+    ListHorizonPreset,
+} from './components/DispatchViewControlTypes'
 
 interface DispatchBoardProps {
     // Data
@@ -46,6 +52,8 @@ interface DispatchBoardProps {
     setStartDate: (date: Date) => void
     viewMode: ViewDensityMode
     setViewMode: (mode: ViewDensityMode) => void
+    listHorizonPreset: ListHorizonPreset
+    setListHorizonPreset: (preset: ListHorizonPreset) => void
     displayMode?: DisplayMode
     setDisplayMode?: (mode: DisplayMode) => void
     selectedOrders: Set<string>
@@ -78,6 +86,9 @@ interface DispatchBoardProps {
     orgId: string | undefined
 }
 
+const LIST_OPERATIONS_PAST_DAYS = 7
+const LIST_OPERATIONS_FUTURE_DAYS = 14
+
 export function DispatchBoard({
     dispatchOrders,
     fleetSetUnits,
@@ -95,7 +106,9 @@ export function DispatchBoard({
     setStartDate,
     viewMode,
     setViewMode,
-    displayMode,
+    listHorizonPreset,
+    setListHorizonPreset,
+    displayMode = 'gantt',
     setDisplayMode,
     selectedOrders,
     setSelectedOrders,
@@ -140,6 +153,70 @@ export function DispatchBoard({
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
     const [activeBoard, setActiveBoard] = useState<DispatchBoardFilterKey>('ALL')
 
+    // Operational list: hide canceled orders by default (still audited in DB)
+    const operationalListBaseOrders = useMemo(
+        () => dispatchOrders.filter((order) => order.substatus !== 'CANCELED'),
+        [dispatchOrders]
+    )
+
+    const effectiveListRange = useMemo(() => {
+        const from = new Date(startDate)
+        from.setHours(0, 0, 0, 0)
+        const to = new Date(startDate)
+
+        if (listHorizonPreset === 'TODAY') {
+            to.setDate(to.getDate())
+        } else if (listHorizonPreset === 'THREE_DAYS') {
+            to.setDate(to.getDate() + 2)
+        } else {
+            from.setDate(from.getDate() - LIST_OPERATIONS_PAST_DAYS)
+            to.setDate(to.getDate() + LIST_OPERATIONS_FUTURE_DAYS)
+        }
+
+        to.setHours(23, 59, 59, 999)
+        return { from, to }
+    }, [startDate, listHorizonPreset])
+
+    // Operational list: apply selected horizon (preset or custom)
+    const listDateFilteredOrders = useMemo(() => {
+        return operationalListBaseOrders.filter((order) => {
+            if (!order.planned_start_at) return false
+            const orderDate = new Date(order.planned_start_at)
+            return orderDate >= effectiveListRange.from && orderDate <= effectiveListRange.to
+        })
+    }, [operationalListBaseOrders, effectiveListRange])
+
+    const listCalendarRangeLabel = useMemo(() => {
+        const first = new Date(effectiveListRange.from)
+        first.setHours(0, 0, 0, 0)
+
+        const last = new Date(effectiveListRange.to)
+        last.setHours(0, 0, 0, 0)
+
+        const sameYear = first.getFullYear() === last.getFullYear()
+        const sameMonth = first.getMonth() === last.getMonth()
+
+        if (sameMonth && sameYear) {
+            return `${first.getDate()} – ${last.getDate()} ${MONTH_NAMES_LOWER[first.getMonth()]} ${first.getFullYear()}`
+        }
+        if (sameYear) {
+            return `${first.getDate()} ${MONTH_NAMES_LOWER[first.getMonth()]} – ${last.getDate()} ${MONTH_NAMES_LOWER[last.getMonth()]} ${first.getFullYear()}`
+        }
+        return `${first.getDate()} ${MONTH_NAMES_LOWER[first.getMonth()]} ${first.getFullYear()} – ${last.getDate()} ${MONTH_NAMES_LOWER[last.getMonth()]} ${last.getFullYear()}`
+    }, [effectiveListRange])
+
+    const shiftListRange = (direction: -1 | 1) => {
+        const shifted = new Date(startDate)
+        // Navigation in list mode always moves one day while preserving the active window preset.
+        shifted.setDate(shifted.getDate() + direction)
+        shifted.setHours(0, 0, 0, 0)
+        setStartDate(shifted)
+    }
+
+    const handleListPresetChange = (preset: ListHorizonPreset) => {
+        setListHorizonPreset(preset)
+    }
+
     // Helper to convert DispatchOrderWithRelations to CarrierOrder for isOrderHybrid function
     const toCarrierOrderLike = (order: DispatchOrderWithRelations): CarrierOrder => {
         const mappedItems = (order.dispatch_order_items || []).map((item) => ({
@@ -157,8 +234,8 @@ export function DispatchBoard({
 
     // Filter orders by board
     const boardFilteredOrders = useMemo(
-        () => filterOrdersByBoard(dispatchOrders, activeBoard),
-        [dispatchOrders, activeBoard]
+        () => filterOrdersByBoard(listDateFilteredOrders, activeBoard),
+        [listDateFilteredOrders, activeBoard]
     )
 
     // Filter orders by search term and configuration
@@ -362,13 +439,15 @@ export function DispatchBoard({
                                 ) : null
                             })()}
                             <DispatchViewControls
+                                displayMode={displayMode}
                                 densityMode={viewMode}
                                 onDensityModeChange={setViewMode}
-                                displayMode={displayMode}
+                                listHorizonPreset={listHorizonPreset}
+                                onListHorizonPresetChange={handleListPresetChange}
                                 onDisplayModeChange={setDisplayMode}
-                                calendarRangeLabel={calendarRangeLabel}
-                                onPreviousClick={handlePreviousDay}
-                                onNextClick={handleNextDay}
+                                calendarRangeLabel={displayMode === 'list' ? listCalendarRangeLabel : calendarRangeLabel}
+                                onPreviousClick={displayMode === 'list' ? () => shiftListRange(-1) : handlePreviousDay}
+                                onNextClick={displayMode === 'list' ? () => shiftListRange(1) : handleNextDay}
                                 onDateSelect={(date) => {
                                     if (date) {
                                         const normalized = new Date(date)
@@ -377,7 +456,6 @@ export function DispatchBoard({
                                     }
                                 }}
                                 selectedDate={startDate}
-                                showDensityControls={displayMode === 'gantt'}
                             />
                         </div>
                     }
@@ -387,7 +465,7 @@ export function DispatchBoard({
                     <div className='h-full flex'>
                         {displayMode === 'list' && (
                             <DispatchBoardsSidebar
-                                orders={dispatchOrders}
+                                orders={listDateFilteredOrders}
                                 activeBoard={activeBoard}
                                 onBoardChange={setActiveBoard}
                                 isCollapsed={isSidebarCollapsed}

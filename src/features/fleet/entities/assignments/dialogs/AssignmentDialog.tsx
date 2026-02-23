@@ -80,6 +80,9 @@ export function AssignmentDialog({
     },
   })
 
+  const normalizedVehicleType = (selectedVehicleType ?? '').toUpperCase()
+  const trailerAllowed = normalizedVehicleType === 'TRACTOR'
+
   // Get current vehicle details for title and type logic
   const currentVehicle = useMemo(() => {
     return vehiclesData.find(v => v.id === vehicleId)
@@ -92,6 +95,12 @@ export function AssignmentDialog({
       setSelectedVehicleType(currentVehicle.vehicle_type)
     }
   }, [currentVehicle])
+
+  useEffect(() => {
+    if (selectedVehicleType && selectedVehicleType !== 'TRACTOR') {
+      form.setValue('trailer_id', null, { shouldValidate: true, shouldDirty: true })
+    }
+  }, [selectedVehicleType, form])
 
   // Ensure vehicle_id is set from props (Context is Immutable)
   useEffect(() => {
@@ -192,6 +201,7 @@ export function AssignmentDialog({
 
       const assignmentData = {
         ...data,
+        trailer_id: trailerAllowed ? data.trailer_id || null : null,
         org_id: orgId,
         starts_at: new Date(data.starts_at).toISOString(),
         ends_at: data.ends_at ? new Date(data.ends_at).toISOString() : null,
@@ -209,7 +219,7 @@ export function AssignmentDialog({
         carrier_id: inferredCarrierId,
         driver_id: data.driver_id ?? null,
         vehicle_id: data.vehicle_id,
-        trailer_id: data.trailer_id || null,
+        trailer_id: assignmentData.trailer_id,
         starts_at: assignmentData.starts_at,
         ends_at: assignmentData.ends_at,
         is_active: true,
@@ -301,13 +311,10 @@ export function AssignmentDialog({
                 label="Remolque"
                 id="trailer_id"
                 required={false}
-                placeholder={
-                  selectedVehicleType === 'TRACTOR'
-                    ? 'Seleccionar remolque'
-                    : 'Seleccionar remolque'
-                }
+                placeholder={trailerAllowed ? 'Seleccionar remolque' : 'No aplica para este tipo de vehículo'}
                 searchPlaceholder="Buscar remolque..."
                 options={trailers}
+                disabled={!trailerAllowed}
                 value={
                   form.watch('trailer_id') === null && (assignment?.trailer_id || trailerId)
                     ? 'unassign'
@@ -322,8 +329,8 @@ export function AssignmentDialog({
                 }}
                 error={form.formState.errors.trailer_id?.message}
                 helpText={
-                  selectedVehicleType === 'RIGID' || selectedVehicleType === 'VAN'
-                    ? 'Generalmente no aplica para vehículos rígidos'
+                  !trailerAllowed
+                    ? 'Solo los vehículos TRACTOR pueden operar con remolque'
                     : undefined
                 }
               />

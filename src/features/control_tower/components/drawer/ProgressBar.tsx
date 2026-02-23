@@ -16,8 +16,8 @@ export function ProgressBar({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-gray-400 text-[11px]">{label}</span>
-        <span className="text-gray-900 text-[13px] font-normal">{value}</span>
+        <span className="text-gray-400 text-[11px] leading-none">{label}</span>
+        <span className="text-gray-700 text-[13px] font-medium leading-none">{value}</span>
       </div>
       <div className="relative w-full bg-gray-200 rounded-full h-1">
         <div

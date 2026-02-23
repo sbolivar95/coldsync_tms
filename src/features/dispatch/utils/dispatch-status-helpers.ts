@@ -140,6 +140,10 @@ const SUBSTATUS_CONFIG: Record<
     label: 'Despachada',
     dotColor: '#10b981', // green
   },
+  EN_ROUTE_TO_ORIGIN: {
+    label: 'En Ruta a Origen',
+    dotColor: '#8b5cf6', // purple
+  },
   AT_ORIGIN: {
     label: 'En Origen',
     dotColor: '#3b82f6', // blue

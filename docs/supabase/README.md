@@ -41,7 +41,7 @@ Arquitectura completa de Supabase, incluyendo:
 
 ## 🔐 Autenticación
 
-### [Authentication](./authentication.md)
+### [Authentication](../business/authentication.md)
 Sistema de autenticación y autorización:
 - **Supabase Auth** - Configuración y flujos
 - **Roles del Sistema** - Platform Admin, Organization Owner, etc.

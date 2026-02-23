@@ -8,6 +8,7 @@ import type { User } from '../types/user.types'
 import type { FleetSetWithOrders } from '../features/dispatch/types'
 import type { Order } from '../lib/mockData'
 import type { DispatchOrder } from '../types/dispatch.types'
+import type { TrackingUnit } from '../features/control_tower/types'
 
 interface BreadcrumbItem {
   label: string
@@ -191,6 +192,15 @@ interface AppState {
   // User Preferences
   dispatchViewPreference: 'list' | 'gantt'
   setDispatchViewPreference: (view: 'list' | 'gantt') => void
+
+  // Control Tower
+  controlTowerUnits: TrackingUnit[]
+  controlTowerLoading: boolean
+  controlTowerLoadedOrgId: string | null
+  setControlTowerUnits: (units: TrackingUnit[]) => void
+  setControlTowerLoading: (loading: boolean) => void
+  setControlTowerLoadedOrgId: (orgId: string | null) => void
+  clearControlTowerUnits: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -256,6 +266,9 @@ export const useAppStore = create<AppState>((set) => ({
       orders: [],
       ordersLoadedOrgId: null,
       ordersLoading: false,
+      controlTowerUnits: [],
+      controlTowerLoadedOrgId: null,
+      controlTowerLoading: false,
     }),
 
   // UI
@@ -497,5 +510,18 @@ export const useAppStore = create<AppState>((set) => ({
   // User Preferences (persisted in Zustand)
   dispatchViewPreference: 'list',
   setDispatchViewPreference: (view) => set({ dispatchViewPreference: view }),
+
+  // Control Tower
+  controlTowerUnits: [],
+  controlTowerLoading: false,
+  controlTowerLoadedOrgId: null,
+  setControlTowerUnits: (units) => set({ controlTowerUnits: units }),
+  setControlTowerLoading: (loading) => set({ controlTowerLoading: loading }),
+  setControlTowerLoadedOrgId: (orgId) => set({ controlTowerLoadedOrgId: orgId }),
+  clearControlTowerUnits: () => set({
+    controlTowerUnits: [],
+    controlTowerLoadedOrgId: null,
+    controlTowerLoading: false,
+  }),
 }))
 

@@ -6,6 +6,13 @@ import { ConnectionDeviceFormData } from '../../../../../lib/schemas/hardware.sc
 import { useHardwareCatalog } from '../../../../../hooks/useHardwareCatalog'
 import { useState, useEffect, useMemo } from 'react'
 import { Label } from '../../../../../components/ui/Label'
+import { Checkbox } from '../../../../../components/ui/Checkbox'
+import {
+    FormControl,
+    FormField,
+    FormItem,
+    FormMessage,
+} from '../../../../../components/ui/Form'
 import { SmartSelect, SmartOption } from '../../../../../components/widgets/SmartSelect'
 import { AddProtocolDialog } from '../dialogs/AddProtocolDialog'
 import { RotateCw, SlidersHorizontal } from 'lucide-react'
@@ -196,6 +203,45 @@ export function HardwareGeneralForm({
                         name="serial"
                         label="Número de Serie"
                         placeholder="Busque en la etiqueta..."
+                    />
+
+                    <div className="space-y-2">
+                        <Label className="text-xs text-gray-600 block h-4">
+                            Soporta CAN
+                        </Label>
+                        <FormField
+                            control={form.control}
+                            name="has_can"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <div className="flex items-center space-x-2 h-10 border border-transparent">
+                                        <FormControl>
+                                            <Checkbox
+                                                checked={field.value || false}
+                                                onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                                            />
+                                        </FormControl>
+                                        <Label className="text-sm text-gray-700 cursor-pointer select-none font-normal">
+                                            Habilitar telemetría CAN
+                                        </Label>
+                                    </div>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+
+                    <CustomSelectField
+                        form={form}
+                        name="temp_mode"
+                        label="Modo de Temperatura"
+                        options={[
+                            { value: 'NONE', label: 'Sin temperatura' },
+                            { value: 'SINGLE', label: 'Zona única' },
+                            { value: 'MULTI', label: 'Multizona' }
+                        ]}
+                        placeholder="Seleccionar modo"
+                        searchable={false}
                     />
 
                     <CustomTextField

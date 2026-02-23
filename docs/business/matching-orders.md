@@ -28,7 +28,7 @@ Sin matching gobernado, el sistema cae en:
 
 - Sobreasignación de unidades
 - Incumplimiento de cita por ETA inviable
-- Violación de ciclo de servicio (RTA)
+- Violación de disponibilidad operativa en origen (`ETA at Origen`)
 - Asignaciones válidas en papel pero inviables en operación
 
 Matching corrige eso con un pipeline de decisión determinístico.
@@ -82,7 +82,7 @@ Matching se ejecuta en seis pasos obligatorios:
 
 1. **Elegibilidad de datos** (input mínimo válido)
 2. **Factibilidad dura** (hard constraints)
-3. **Factibilidad temporal** (RTA + ETA + ventana)
+3. **Factibilidad temporal** (`ETA at Origen` + ventana)
 4. **Detección de conflictos** (solapamientos)
 5. **Reglas contractuales de capacidad (allocation/cupos)**
 6. **Ranking y selección** (soft constraints)
@@ -92,6 +92,12 @@ Salida del motor:
 - Candidatos factibles ordenados por score.
 - Reason codes de aceptación/rechazo por candidato.
 - Propuesta para revisión del planner en Dispatch.
+
+Consumo operativo obligatorio:
+
+- Matching solo expone como seleccionables candidatos con `MATCH_SUCCESS`.
+- Candidatos con `NO_MATCH_*` son bloqueantes en la interacción de planificación (no se deben poder seleccionar/confirmar).
+- La causa (`reason_code`) se muestra antes de ejecutar la acción, no después del intento.
 
 Si cualquier paso obligatorio falla:
 
@@ -157,12 +163,17 @@ La asignación se bloquea si falla cualquiera de:
 3. Reefer no cubre envelope térmico requerido
 4. Orden híbrida sin compatibilidad de zonas/compartimentos
 5. Fecha/hora objetivo en pasado
-6. Unidad en ciclo de servicio no disponible (RTA)
+6. Unidad no disponible dentro del tiempo requerido de `ETA at Origen`
 7. Imposibilidad matemática de llegar a origen dentro de cita
 
 Regla:
 
 > Hard constraints no se sobreescriben manualmente.
+
+Implicación operativa:
+
+- Si existe hard constraint, no se permite avanzar a asignación tentativa.
+- El sistema debe bloquear la acción en el punto de decisión y exponer `reason_code` bloqueante.
 
 ### 5.1 Regla de peso en capacidad contratada
 
@@ -215,20 +226,19 @@ Regla:
 
 ---
 
-## 6. Factibilidad temporal (RTA + ETA)
+## 6. Factibilidad temporal (`ETA at Origen` + ventana)
 
 Este punto es obligatorio en matching moderno.
 
 Matching debe validar simultáneamente:
 
-- `RTA`: cuándo la unidad vuelve a estar disponible
-- `ETA a origen`: cuándo puede llegar a cargar
+- `ETA at Origen`: cuándo la unidad está disponible y puede llegar a cargar en origen
 - `Ventana/cita`: cuándo debe presentarse
 
 Bloqueo temporal:
 
-- Si `ETA a origen` cae fuera de ventana tolerada, no hay match.
-- Si la unidad sigue bloqueada por RTA, no hay match.
+- Si `ETA at Origen` cae fuera de ventana tolerada, no hay match.
+- Si no existe `ETA at Origen` confiable, no hay match.
 
 ---
 
@@ -404,7 +414,7 @@ Toda decisión de matching debe emitir razones estructuradas:
 - `NO_MATCH_CAPACITY`
 - `NO_MATCH_THERMAL`
 - `NO_MATCH_MULTI_ZONE`
-- `NO_MATCH_RTA`
+- `NO_MATCH_ETA_ORIGIN`
 - `NO_MATCH_ETA_WINDOW`
 - `NO_MATCH_OVERLAP`
 - `NO_MATCH_ALLOCATION_CAP`
@@ -412,6 +422,11 @@ Toda decisión de matching debe emitir razones estructuradas:
 - `NO_MATCH_DATA_INCOMPLETE`
 
 Esto es obligatorio para auditoría y mejora continua.
+
+Regla de uso:
+
+- En cualquier bloqueo de factibilidad, `reason_code` es obligatorio.
+- Si una decisión es bloqueante y no hay `reason_code`, la decisión es inválida.
 
 ---
 

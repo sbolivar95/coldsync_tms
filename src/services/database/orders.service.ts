@@ -14,19 +14,46 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 
 import { REJECTION_REASON_LABELS } from '../../lib/constants/rejectionReasons';
 
-// Status mappings for carrier view
+// Substatus mappings for carrier view
 export const CARRIER_ORDER_STATUSES = {
-  // Solicitudes (Requests) - orders awaiting carrier response
+  // Requests - TENDERS/PENDING
   SOLICITUDES: ['PENDING'] as const,
-  
-  // Compromisos (Commitments) - carrier has accepted
-  COMPROMISOS: ['SCHEDULED', 'DISPATCHED', 'AT_DESTINATION'] as const,
-  
-  // Historial (History) - completed or terminated orders
-  HISTORIAL: ['REJECTED', 'CANCELED', 'OBSERVANCE', 'COMPLETED'] as const,
+
+  // Commitments - TENDERS/ACCEPTED + SCHEDULED/*
+  COMPROMISOS: ['ACCEPTED', 'PROGRAMMED', 'DISPATCHED', 'EN_ROUTE_TO_ORIGIN', 'AT_ORIGIN', 'LOADING'] as const,
+
+  // History - completed or terminated orders
+  HISTORIAL: ['REJECTED', 'EXPIRED', 'OBSERVED', 'CANCELED'] as const,
 } as const;
 
 export type CarrierOrderCategory = 'solicitudes' | 'compromisos' | 'historial';
+
+// Fleet set with relations for availability check (as returned by Supabase)
+export interface FleetSetWithRelations {
+  id: string;
+  is_active: boolean;
+  vehicle: {
+    id: string;
+    plate: string;
+    unit_code: string;
+    brand: string | null;
+    model: string | null;
+  } | null;
+  trailer: {
+    id: string;
+    plate: string;
+    code: string;
+  } | null;
+  driver: {
+    id: number;
+    name: string;
+    driver_id: string;
+  } | null;
+  orders: Array<{
+    id: string;
+    substatus: string;
+  }>;
+}
 
 // Core dispatch order fields from Supabase
 export interface RejectionReason {
@@ -41,7 +68,8 @@ export interface CarrierOrder {
   id: string;
   org_id: string;
   dispatch_number: string;
-  status: string;
+  stage: string;
+  substatus: string;
   lane_id: string | null;
   fleet_set_id: string | null;
   carrier_id: number | null;
@@ -59,7 +87,7 @@ export interface CarrierOrder {
   updated_by: string | null;
   carrier_assigned_at?: string | null;
   response_deadline?: string | null;
-  
+
   // Joined relations
   lane?: {
     id: string;
@@ -123,7 +151,7 @@ class OrdersService {
 
   /**
    * Get all orders for a specific carrier
-   * Filters by stage='TENDERS' to show only orders in the tenders/orders module
+   * Filters by stage in ['TENDERS', 'SCHEDULED'] to show orders in tenders and scheduled stages
    */
   async getCarrierOrders(
     carrierId: number,
@@ -185,7 +213,7 @@ class OrdersService {
       `)
       .eq('carrier_id', carrierId)
       .eq('org_id', orgId)
-      .eq('stage', 'TENDERS')
+      .in('stage', ['TENDERS', 'SCHEDULED'])
       .order('planned_start_at', { ascending: true });
 
     if (error) {
@@ -198,15 +226,15 @@ class OrdersService {
 
   /**
    * Get orders by category for carrier view
-   * Filters by stage='TENDERS' to show only orders in the tenders/orders module
+   * Filters by stage in ['TENDERS', 'SCHEDULED'] and substatus
    */
   async getCarrierOrdersByCategory(
     carrierId: number,
     orgId: string,
     category: CarrierOrderCategory
   ): Promise<CarrierOrder[]> {
-    const statuses = CARRIER_ORDER_STATUSES[category.toUpperCase() as keyof typeof CARRIER_ORDER_STATUSES];
-    
+    const substatuses = CARRIER_ORDER_STATUSES[category.toUpperCase() as keyof typeof CARRIER_ORDER_STATUSES];
+
     const { data, error } = await supabase
       .from('dispatch_orders')
       .select(`
@@ -263,8 +291,8 @@ class OrdersService {
       `)
       .eq('carrier_id', carrierId)
       .eq('org_id', orgId)
-      .eq('stage', 'TENDERS')
-      .in('status', statuses)
+      .in('stage', ['TENDERS', 'SCHEDULED'])
+      .in('substatus', substatuses)
       .order('planned_start_at', { ascending: true });
 
     if (error) {
@@ -318,8 +346,9 @@ class OrdersService {
     return (data || []).map((record: any) => ({
       id: record.dispatch_order?.id || record.id, // Use order ID (or history ID fallback)
       dispatch_number: record.dispatch_order?.dispatch_number || '---',
-      // Force status to REJECTED so the badge shows correctly in the UI
-      status: 'REJECTED', 
+      // Force substatus to REJECTED so the badge shows correctly in the UI
+      stage: 'TENDERS',
+      substatus: 'REJECTED',
       lane: record.dispatch_order?.lane,
       planned_start_at: record.dispatch_order?.planned_start_at || record.responded_at,
       items: record.dispatch_order?.items || [],
@@ -327,7 +356,7 @@ class OrdersService {
       // Auxiliary fields to satisfy type (mostly unused in the card view)
       org_id: orgId,
       carrier_id: carrierId,
-      created_at: record.responded_at, 
+      created_at: record.responded_at,
     })) as unknown as CarrierOrder[];
   }
 
@@ -362,35 +391,35 @@ class OrdersService {
   ): Promise<CarrierOrder> {
     // 1. Get Current Order's Fleet Set (Fleet A)
     const { data: currentOrder } = await supabase
-        .from('dispatch_orders')
-        .select('fleet_set_id')
-        .eq('id', dispatchOrderId)
-        .single();
-    
+      .from('dispatch_orders')
+      .select('fleet_set_id')
+      .eq('id', dispatchOrderId)
+      .single();
+
     // 2. Find any Conflicting Pending Order (Order B) that holds New Fleet Set (Fleet B)
     const { data: conflictingOrders } = await supabase
-        .from('dispatch_orders')
-        .select('id')
-        .eq('fleet_set_id', newFleetSetId)
-        .eq('status', 'PENDING'); // Only swap with Pending orders
+      .from('dispatch_orders')
+      .select('id')
+      .eq('fleet_set_id', newFleetSetId)
+      .eq('substatus', 'PENDING'); // Only swap with Pending orders
 
     // 3. Perform Swap: Assign Fleet A (or null) to Order B
     if (conflictingOrders && conflictingOrders.length > 0) {
-        const oldFleetSetId = currentOrder?.fleet_set_id || null;
-        for (const conflict of conflictingOrders) {
-             // We update directly. If Fleet A is null, Order B becomes Unassigned.
-             // If Fleet A is valid, Order B gets Fleet A.
-            const { error: swapError } = await supabase
-                .from('dispatch_orders')
-                .update({ fleet_set_id: oldFleetSetId })
-                .eq('id', conflict.id);
-            
-            if (swapError) {
-                console.error("Error swapping fleet set:", swapError);
-                // We proceed anyway? Or throw? Better to throw to prevent partial state.
-                throw new Error("Failed to swap fleet set on conflicting order"); 
-            }
+      const oldFleetSetId = currentOrder?.fleet_set_id || null;
+      for (const conflict of conflictingOrders) {
+        // We update directly. If Fleet A is null, Order B becomes Unassigned.
+        // If Fleet A is valid, Order B gets Fleet A.
+        const { error: swapError } = await supabase
+          .from('dispatch_orders')
+          .update({ fleet_set_id: oldFleetSetId })
+          .eq('id', conflict.id);
+
+        if (swapError) {
+          console.error("Error swapping fleet set:", swapError);
+          // We proceed anyway? Or throw? Better to throw to prevent partial state.
+          throw new Error("Failed to swap fleet set on conflicting order");
         }
+      }
     }
 
     // 4. Proceed with original logic: Assign Fleet B to Order A and Accept
@@ -472,7 +501,7 @@ class OrdersService {
 
         if (!history || history.length === 0) {
           console.warn('Rejection history missing after RPC, inserting manually...');
-          
+
           // Insert history record manually
           await supabase
             .from('dispatch_order_carrier_history')
@@ -509,7 +538,7 @@ class OrdersService {
           carrier_assigned_at: null // Optional: Clear assignment time
         })
         .eq('id', dispatchOrderId);
-        
+
     } catch (cleanupError) {
       console.error('Error cleaning up rejected order assignment:', cleanupError);
       // Non-blocking
@@ -561,10 +590,10 @@ class OrdersService {
         .from('organization_members')
         .select('user_id, first_name, last_name, email')
         .in('user_id', Array.from(userIds));
-      
+
       usersData?.forEach(u => {
         if (u.user_id) {
-           usersMap.set(u.user_id, { first_name: u.first_name, last_name: u.last_name, email: u.email });
+          usersMap.set(u.user_id, { first_name: u.first_name, last_name: u.last_name, email: u.email });
         }
       });
     }
@@ -617,7 +646,7 @@ class OrdersService {
   /**
    * Get available fleet sets for a carrier
    */
-  async getAvailableFleetSets(carrierId: number, orgId: string) {
+  async getAvailableFleetSets(carrierId: number, orgId: string): Promise<FleetSetWithRelations[]> {
     const { data, error } = await supabase
       .from('fleet_sets')
       .select(`
@@ -642,7 +671,7 @@ class OrdersService {
         ),
         orders:dispatch_orders!dispatch_orders_fleet_set_id_fkey (
           id,
-          status
+          substatus
         )
       `)
       .eq('carrier_id', carrierId)
@@ -655,7 +684,7 @@ class OrdersService {
       throw error;
     }
 
-    return data || [];
+    return data as unknown as FleetSetWithRelations[];
   }
 
   /**
@@ -729,10 +758,10 @@ class OrdersService {
   ): Promise<{ solicitudes: number; compromisos: number; historial: number }> {
     const { data, error } = await supabase
       .from('dispatch_orders')
-      .select('status')
+      .select('substatus')
       .eq('carrier_id', carrierId)
       .eq('org_id', orgId)
-      .eq('stage', 'TENDERS');
+      .in('stage', ['TENDERS', 'SCHEDULED']);
 
     if (error) {
       console.error('Error fetching order counts:', error);
@@ -740,16 +769,16 @@ class OrdersService {
     }
 
     const orders = data || [];
-    
+
     return {
-      solicitudes: orders.filter(o => 
-        CARRIER_ORDER_STATUSES.SOLICITUDES.includes(o.status as any)
+      solicitudes: orders.filter(o =>
+        CARRIER_ORDER_STATUSES.SOLICITUDES.includes(o.substatus)
       ).length,
-      compromisos: orders.filter(o => 
-        CARRIER_ORDER_STATUSES.COMPROMISOS.includes(o.status as any)
+      compromisos: orders.filter(o =>
+        CARRIER_ORDER_STATUSES.COMPROMISOS.includes(o.substatus)
       ).length,
-      historial: orders.filter(o => 
-        CARRIER_ORDER_STATUSES.HISTORIAL.includes(o.status as any)
+      historial: orders.filter(o =>
+        CARRIER_ORDER_STATUSES.HISTORIAL.includes(o.substatus)
       ).length,
     };
   }
@@ -764,19 +793,19 @@ class OrdersService {
     isUrgent: boolean;
   } {
     const now = new Date();
-    
+
     let deadline: Date;
     if (order.response_deadline) {
-        deadline = new Date(order.response_deadline);
+      deadline = new Date(order.response_deadline);
     } else {
-        // Fallback: 24h before planned_start_at
-        const plannedStart = new Date(order.planned_start_at);
-        deadline = new Date(plannedStart.getTime() - 24 * 60 * 60 * 1000); 
+      // Fallback: 24h before planned_start_at
+      const plannedStart = new Date(order.planned_start_at);
+      deadline = new Date(plannedStart.getTime() - 24 * 60 * 60 * 1000);
     }
-    
+
     const msRemaining = deadline.getTime() - now.getTime();
     const hoursRemaining = Math.max(0, msRemaining / (1000 * 60 * 60));
-    
+
     return {
       hoursRemaining,
       isExpired: msRemaining <= 0,

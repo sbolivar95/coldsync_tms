@@ -12,8 +12,8 @@ export function InfoGrid({ fields }: InfoGridProps) {
     <div className="grid grid-cols-5 gap-5 pt-2 items-end">
       {fields.map((field, index) => (
         <div key={index}>
-          <p className="text-gray-400 text-[11px] pb-1">{field.label}</p>
-          <p className="text-gray-900 text-[13px] h-6 flex items-center">
+          <p className="text-gray-400 text-[11px] pb-1 leading-none">{field.label}</p>
+          <p className="text-gray-700 text-[13px] font-medium h-6 flex items-center">
             {field.value}
           </p>
         </div>

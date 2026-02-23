@@ -60,7 +60,7 @@ export function Sidebar({ activeView, onViewChange, collapsed, onToggle }: Sideb
       "h-screen bg-[#1a1d2e] text-white flex flex-col",
       collapsed ? "w-16" : "w-64"
     )}>
-      {/* Header con Logo */}
+      {/* Header with Logo */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700/50">
         {!collapsed ? (
           <div className="flex items-center">
@@ -87,59 +87,65 @@ export function Sidebar({ activeView, onViewChange, collapsed, onToggle }: Sideb
         </button>
       </div>
 
-      {/* Navegación principal */}
+      {/* Main navigation */}
       <nav className="flex-1 py-4 space-y-1 px-2">
-        {menuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onViewChange(item.id)}
-            className={cn(
-              "w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all relative group",
-              activeView === item.id
-                ? "text-white bg-gray-700/30"
-                : "text-gray-400 hover:bg-gray-700/20 hover:text-white"
-            )}
-            title={collapsed ? item.label : undefined}
-          >
-            {/* Underline izquierdo cuando está activo */}
-            {activeView === item.id && (
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r bg-primary" />
-            )}
+        {menuItems.map((item) => {
+          const isActive = activeView === item.id || (item.id !== '/' && activeView.startsWith(item.id + '/'));
+          return (
+            <button
+              key={item.id}
+              onClick={() => onViewChange(item.id)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all relative group",
+                isActive
+                  ? "text-white bg-gray-700/30"
+                  : "text-gray-400 hover:bg-gray-700/20 hover:text-white"
+              )}
+              title={collapsed ? item.label : undefined}
+            >
+              {/* Left underline when active */}
+              {isActive && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r bg-primary" />
+              )}
 
-            <item.icon className="w-5 h-5 shrink-0" />
-            {!collapsed && <span className="text-sm">{item.label}</span>}
-          </button>
-        ))}
+              <item.icon className="w-5 h-5 shrink-0" />
+              {!collapsed && <span className="text-sm">{item.label}</span>}
+            </button>
+          );
+        })}
       </nav>
 
-      {/* Separador */}
+      {/* Separator */}
       <div className="px-4 py-2">
         <div className="border-t border-gray-700/50"></div>
       </div>
 
-      {/* Navegación inferior */}
+      {/* Bottom navigation */}
       <nav className="pb-4 space-y-1 px-2">
-        {bottomMenuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onViewChange(item.id)}
-            className={cn(
-              "w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all relative group",
-              activeView === item.id
-                ? "text-white bg-gray-700/30"
-                : "text-gray-400 hover:bg-gray-700/20 hover:text-white"
-            )}
-            title={collapsed ? item.label : undefined}
-          >
-            {/* Underline izquierdo cuando está activo */}
-            {activeView === item.id && (
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r bg-primary" />
-            )}
+        {bottomMenuItems.map((item) => {
+          const isActive = activeView === item.id || (item.id !== '/' && activeView.startsWith(item.id + '/'));
+          return (
+            <button
+              key={item.id}
+              onClick={() => onViewChange(item.id)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all relative group",
+                isActive
+                  ? "text-white bg-gray-700/30"
+                  : "text-gray-400 hover:bg-gray-700/20 hover:text-white"
+              )}
+              title={collapsed ? item.label : undefined}
+            >
+              {/* Left underline when active */}
+              {isActive && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r bg-primary" />
+              )}
 
-            <item.icon className="w-5 h-5 shrink-0" />
-            {!collapsed && <span className="text-sm">{item.label}</span>}
-          </button>
-        ))}
+              <item.icon className="w-5 h-5 shrink-0" />
+              {!collapsed && <span className="text-sm">{item.label}</span>}
+            </button>
+          );
+        })}
       </nav>
     </div>
   );

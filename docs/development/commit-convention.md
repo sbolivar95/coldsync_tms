@@ -27,7 +27,7 @@ tipo(contexto): descripción
 
 Usa `kebab-case` para el área de contexto. Opcionalmente incluye el nombre del componente con `/`:
 
-- `auth`: Autenticación (ver [../supabase/authentication.md](../supabase/authentication.md))
+- `auth`: Autenticación (ver [../business/authentication.md](../business/authentication.md))
 - `dispatch`: Módulo de Despacho (ver [../business/dispatch.md](../business/dispatch.md))
 - `control-tower`: Torre de Control (ver [../business/control-tower.md](../business/control-tower.md))
 - `reconciliation`: Módulo de Conciliación (ver [../business/reconciliation.md](../business/reconciliation.md))

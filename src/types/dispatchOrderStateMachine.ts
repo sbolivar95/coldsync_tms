@@ -18,7 +18,7 @@ import type { DispatchOrderStage, DispatchOrderSubstatus } from './dispatch.type
 export const STAGE_SUBSTATUS_MAP: Record<DispatchOrderStage, DispatchOrderSubstatus[]> = {
   DISPATCH: ['NEW', 'UNASSIGNED', 'ASSIGNED'],
   TENDERS: ['PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED'],
-  SCHEDULED: ['PROGRAMMED', 'DISPATCHED', 'AT_ORIGIN', 'LOADING', 'OBSERVED'],
+  SCHEDULED: ['PROGRAMMED', 'DISPATCHED', 'EN_ROUTE_TO_ORIGIN', 'AT_ORIGIN', 'LOADING', 'OBSERVED'],
   EXECUTION: ['IN_TRANSIT', 'AT_DESTINATION', 'DELIVERED'],
   CONCILIATION: ['PENDING_AUDIT', 'UNDER_REVIEW', 'DISPUTED', 'APPROVED', 'CLOSED'],
 };
@@ -82,6 +82,10 @@ export const VALID_TRANSITIONS: Record<DispatchOrderSubstatus, StateTransition[]
     { toStage: 'SCHEDULED', toSubstatus: 'CANCELED' },
   ],
   DISPATCHED: [
+    { toStage: 'SCHEDULED', toSubstatus: 'EN_ROUTE_TO_ORIGIN' },
+    { toStage: 'SCHEDULED', toSubstatus: 'CANCELED' },
+  ],
+  EN_ROUTE_TO_ORIGIN: [
     { toStage: 'SCHEDULED', toSubstatus: 'AT_ORIGIN' },
     { toStage: 'SCHEDULED', toSubstatus: 'CANCELED' },
   ],
@@ -175,6 +179,7 @@ export const SUBSTATUS_DISPLAY: Record<DispatchOrderSubstatus, SubstatusDisplayC
   // SCHEDULED
   PROGRAMMED: { label: 'Programada', color: '#10b981', bgColor: '#ecfdf5' },
   DISPATCHED: { label: 'Despachada', color: '#3b82f6', bgColor: '#eff6ff' },
+  EN_ROUTE_TO_ORIGIN: { label: 'En Ruta a Origen', color: '#8b5cf6', bgColor: '#f5f3ff' },
   AT_ORIGIN: { label: 'En Origen', color: '#8b5cf6', bgColor: '#f5f3ff' },
   LOADING: { label: 'Cargando', color: '#06b6d4', bgColor: '#ecfeff' },
   OBSERVED: { label: 'Observada', color: '#f59e0b', bgColor: '#fffbeb' },

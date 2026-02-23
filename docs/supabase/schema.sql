@@ -1,5 +1,27 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
+-- All custom enums are listed below to reflect the database reality.
+
+CREATE TYPE public.account_status AS ENUM ('ACTIVE', 'PAST_DUE', 'SUSPENDED', 'CANCELED', 'INACTIVE');
+CREATE TYPE public.app_load_capacity_type AS ENUM ('PALLET', 'MEAT_HOOK', 'BASKET', 'BOX', 'BIN', 'BULK', 'OTHER');
+CREATE TYPE public.asset_operational_status AS ENUM ('ACTIVE', 'IN_SERVICE', 'IN_MAINTENANCE', 'OUT_OF_SERVICE', 'RETIRED', 'IN_TRANSIT');
+CREATE TYPE public.assigned_type AS ENUM ('VEHICLE', 'TRAILER');
+CREATE TYPE public.canceled_by_type AS ENUM ('CARRIER', 'ORGANIZATION', 'SYSTEM');
+CREATE TYPE public.carrier_assignment_outcome AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'CANCELED_BY_ORG', 'TIMEOUT', 'REASSIGNED', 'CANCELED_OBSERVED');
+CREATE TYPE public.carrier_type AS ENUM ('OWNER', 'THIRD PARTY');
+CREATE TYPE public.currency_code AS ENUM ('BOB', 'USD');
+CREATE TYPE public.dispatch_order_stage AS ENUM ('DISPATCH', 'TENDERS', 'SCHEDULED', 'EXECUTION', 'CONCILIATION');
+CREATE TYPE public.dispatch_order_status AS ENUM ('UNASSIGNED', 'PENDING', 'ASSIGNED', 'REJECTED', 'SCHEDULED', 'AT_DESTINATION', 'DISPATCHED', 'CANCELED', 'OBSERVANCE', 'COMPLETED');
+CREATE TYPE public.dispatch_order_substatus AS ENUM ('NEW', 'UNASSIGNED', 'ASSIGNED', 'PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'PROGRAMMED', 'DISPATCHED', 'EN_ROUTE_TO_ORIGIN', 'AT_ORIGIN', 'LOADING', 'OBSERVED', 'IN_TRANSIT', 'AT_DESTINATION', 'DELIVERED', 'PENDING_AUDIT', 'UNDER_REVIEW', 'DISPUTED', 'APPROVED', 'CLOSED', 'CANCELED');
+CREATE TYPE public.driver_status AS ENUM ('AVAILABLE', 'INACTIVE', 'DRIVING');
+CREATE TYPE public.observance_cause_type AS ENUM ('TEMPERATURE', 'CLEANLINESS', 'EQUIPMENT_FAILURE', 'DOCUMENTATION', 'OTHER');
+CREATE TYPE public.observance_resolution_type AS ENUM ('FIXED', 'CANCELED', 'REJECTED');
+CREATE TYPE public.plan_type AS ENUM ('STARTER', 'PROFESSIONAL');
+CREATE TYPE public.reefer_owner_type AS ENUM ('TRAILER', 'VEHICLE');
+CREATE TYPE public.reefer_power_supply AS ENUM ('DIESEL', 'ELECTRIC', 'HYBRID');
+CREATE TYPE public.stop_types AS ENUM ('PICKUP', 'MANDATORY_WAYPOINT', 'OPTIONAL_WAYPOINT', 'DROP_OFF');
+CREATE TYPE public.user_role AS ENUM ('OWNER', 'ADMIN', 'STAFF', 'DRIVER', 'DEV', 'CARRIER');
+
 
 CREATE TABLE public.accessorial_charge_types (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -101,7 +123,7 @@ CREATE TABLE public.carriers (
   carrier_id text NOT NULL,
   commercial_name text NOT NULL,
   legal_name text NOT NULL,
-  carrier_type USER-DEFINED NOT NULL DEFAULT 'THIRD PARTY'::carrier_type,
+  carrier_type public.carrier_type NOT NULL DEFAULT 'THIRD PARTY'::public.carrier_type,
   tax_id text NOT NULL,
   legal_representative text NOT NULL,
   country text NOT NULL,
@@ -129,7 +151,7 @@ CREATE TABLE public.carriers (
 CREATE TABLE public.connection_device (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   provider integer,
-  tracked_entity_type USER-DEFINED DEFAULT 'TRAILER'::assigned_type,
+  tracked_entity_type public.assigned_type DEFAULT 'TRAILER'::public.assigned_type,
   ident text NOT NULL UNIQUE,
   phone_number text UNIQUE,
   serial text UNIQUE,
@@ -138,6 +160,8 @@ CREATE TABLE public.connection_device (
   flespi_device_id bigint UNIQUE,
   carrier_id integer NOT NULL,
   flespi_device_type_id integer,
+  has_can boolean DEFAULT false,
+  temp_mode text DEFAULT 'NONE'::text CHECK (temp_mode = ANY (ARRAY['NONE'::text, 'REEFER'::text, 'AMBIENT'::text])),
   CONSTRAINT connection_device_pkey PRIMARY KEY (id),
   CONSTRAINT connection_device_carrier_id_fkey FOREIGN KEY (carrier_id) REFERENCES public.carriers(id),
   CONSTRAINT connection_device_provider_fkey FOREIGN KEY (provider) REFERENCES public.telematics_provider(id),
@@ -175,7 +199,7 @@ CREATE TABLE public.dispatch_order_carrier_history (
   assigned_by uuid,
   responded_at timestamp with time zone,
   responded_by uuid,
-  outcome USER-DEFINED NOT NULL DEFAULT 'PENDING'::carrier_assignment_outcome,
+  outcome public.carrier_assignment_outcome NOT NULL DEFAULT 'PENDING'::public.carrier_assignment_outcome,
   outcome_reason text,
   allocation_period_id uuid,
   counted_as text CHECK (counted_as = ANY (ARRAY['dispatched'::text, 'rejected'::text, NULL::text])),
@@ -249,11 +273,11 @@ CREATE TABLE public.dispatch_order_observance_history (
   dispatch_order_id uuid NOT NULL,
   carrier_id integer NOT NULL,
   observance_number integer NOT NULL,
-  cause USER-DEFINED NOT NULL,
+  cause public.observance_cause_type NOT NULL,
   reason text,
   observed_at timestamp with time zone NOT NULL DEFAULT now(),
   observed_by uuid,
-  resolution USER-DEFINED,
+  resolution public.observance_resolution_type,
   resolution_notes text,
   resolved_at timestamp with time zone,
   resolved_by uuid,
@@ -274,10 +298,10 @@ CREATE TABLE public.dispatch_order_observance_history (
 CREATE TABLE public.dispatch_order_state_history (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   dispatch_order_id uuid NOT NULL,
-  from_stage USER-DEFINED,
-  from_substatus USER-DEFINED,
-  to_stage USER-DEFINED NOT NULL,
-  to_substatus USER-DEFINED NOT NULL,
+  from_stage public.dispatch_order_stage,
+  from_substatus public.dispatch_order_substatus,
+  to_stage public.dispatch_order_stage NOT NULL,
+  to_substatus public.dispatch_order_substatus NOT NULL,
   changed_by uuid,
   changed_at timestamp with time zone NOT NULL DEFAULT now(),
   trigger_type text NOT NULL DEFAULT 'USER'::text,
@@ -333,8 +357,8 @@ CREATE TABLE public.dispatch_orders (
   carrier_contract_id uuid,
   rate_card_id uuid,
   response_deadline timestamp with time zone,
-  stage USER-DEFINED NOT NULL DEFAULT 'DISPATCH'::dispatch_order_stage,
-  substatus USER-DEFINED NOT NULL DEFAULT 'NEW'::dispatch_order_substatus,
+  stage public.dispatch_order_stage NOT NULL DEFAULT 'DISPATCH'::public.dispatch_order_stage,
+  substatus public.dispatch_order_substatus NOT NULL DEFAULT 'NEW'::public.dispatch_order_substatus,
   cancellation_reason_id uuid,
   CONSTRAINT dispatch_orders_pkey PRIMARY KEY (id),
   CONSTRAINT dispatch_orders_fleet_set_id_fkey FOREIGN KEY (fleet_set_id) REFERENCES public.fleet_sets(id),
@@ -367,7 +391,7 @@ CREATE TABLE public.drivers (
   nationality bigint NOT NULL,
   address text NOT NULL,
   city text NOT NULL,
-  status USER-DEFINED NOT NULL DEFAULT 'AVAILABLE'::driver_status,
+  status public.driver_status NOT NULL DEFAULT 'AVAILABLE'::public.driver_status,
   contract_date date NOT NULL,
   notes text,
   org_id uuid NOT NULL,
@@ -418,7 +442,7 @@ CREATE TABLE public.lane_stops (
   location_id bigint NOT NULL,
   stop_order integer NOT NULL,
   notes text,
-  stop_type USER-DEFINED,
+  stop_type public.stop_types,
   org_id uuid NOT NULL,
   estimated_duration numeric DEFAULT 0,
   CONSTRAINT lane_stops_pkey PRIMARY KEY (id),
@@ -445,7 +469,7 @@ CREATE TABLE public.lanes (
   lane_type_id integer,
   transit_time numeric,
   operational_buffer numeric,
-  currency USER-DEFINED NOT NULL DEFAULT 'USD'::currency_code,
+  currency public.currency_code NOT NULL DEFAULT 'USD'::public.currency_code,
   supersedes_lane_id uuid,
   CONSTRAINT lanes_pkey PRIMARY KEY (id),
   CONSTRAINT lanes_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id),
@@ -494,7 +518,7 @@ CREATE TABLE public.organization_members (
   org_id uuid NOT NULL,
   user_id uuid,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
-  role USER-DEFINED NOT NULL DEFAULT 'ADMIN'::user_role,
+  role public.user_role NOT NULL DEFAULT 'ADMIN'::public.user_role,
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   first_name text NOT NULL DEFAULT 'Unknown'::text,
   email text NOT NULL DEFAULT 'Unknown'::text,
@@ -541,19 +565,19 @@ CREATE TABLE public.organizations (
   legal_name text NOT NULL UNIQUE,
   city text,
   created_by uuid NOT NULL,
-  status USER-DEFINED NOT NULL DEFAULT 'ACTIVE'::account_status,
+  status public.account_status NOT NULL DEFAULT 'ACTIVE'::public.account_status,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone,
   base_country_id bigint NOT NULL,
   tax_id text,
   fiscal_address text,
   billing_email text,
-  currency USER-DEFINED DEFAULT 'USD'::currency_code,
+  currency public.currency_code DEFAULT 'USD'::public.currency_code,
   time_zone text DEFAULT 'America/La_Paz'::text,
   contact_name text,
   contact_phone text,
   contact_email text,
-  plan_type USER-DEFINED DEFAULT 'PROFESSIONAL'::plan_type,
+  plan_type public.plan_type DEFAULT 'PROFESSIONAL'::public.plan_type,
   CONSTRAINT organizations_pkey PRIMARY KEY (id),
   CONSTRAINT organizations_base_country_id_fkey FOREIGN KEY (base_country_id) REFERENCES public.countries(id),
   CONSTRAINT organizations_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
@@ -675,12 +699,12 @@ CREATE TABLE public.reefer_equipments (
   year integer,
   serial_number character varying,
   reefer_hours numeric,
-  power_type USER-DEFINED DEFAULT 'DIESEL'::reefer_power_supply,
+  power_type public.reefer_power_supply DEFAULT 'DIESEL'::public.reefer_power_supply,
   diesel_capacity_l numeric,
   consumption_lph numeric,
   temp_min_c numeric,
   temp_max_c numeric,
-  owner_type USER-DEFINED NOT NULL,
+  owner_type public.reefer_owner_type NOT NULL,
   owner_id uuid NOT NULL,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
@@ -732,13 +756,13 @@ CREATE TABLE public.trailers (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   connection_device_id uuid UNIQUE,
   org_id uuid NOT NULL,
-  operational_status USER-DEFINED NOT NULL DEFAULT 'ACTIVE'::asset_operational_status,
+  operational_status public.asset_operational_status NOT NULL DEFAULT 'ACTIVE'::public.asset_operational_status,
   carrier_id integer NOT NULL,
   brand text,
   model text,
   year integer,
   vin text,
-  load_capacity_type USER-DEFINED,
+  load_capacity_type public.app_load_capacity_type,
   load_capacity_quantity numeric,
   CONSTRAINT trailers_pkey PRIMARY KEY (id),
   CONSTRAINT trailers_connection_device_id_fkey FOREIGN KEY (connection_device_id) REFERENCES public.connection_device(id),
@@ -761,7 +785,7 @@ CREATE TABLE public.vehicles (
   updated_at timestamp with time zone,
   connection_device_id uuid UNIQUE,
   org_id uuid NOT NULL,
-  operational_status USER-DEFINED NOT NULL DEFAULT 'ACTIVE'::asset_operational_status,
+  operational_status public.asset_operational_status NOT NULL DEFAULT 'ACTIVE'::public.asset_operational_status,
   carrier_id integer NOT NULL,
   transport_capacity_weight_tn numeric,
   volume_m3 numeric,
@@ -773,7 +797,7 @@ CREATE TABLE public.vehicles (
   compartments bigint DEFAULT 1,
   supports_multi_zone boolean DEFAULT false,
   notes text,
-  load_capacity_type USER-DEFINED,
+  load_capacity_type public.app_load_capacity_type,
   load_capacity_quantity numeric,
   CONSTRAINT vehicles_pkey PRIMARY KEY (id),
   CONSTRAINT vehicles_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id),

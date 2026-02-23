@@ -14,7 +14,9 @@ Adicionalmente, cada transición se registra en un **historial de estados** para
 ## Etapas Globales
 
 ```
+
 DISPATCH → TENDERS → SCHEDULED → EXECUTION → CONCILIATION
+
 ```
 
 | Etapa | Módulo | Propósito |
@@ -69,15 +71,17 @@ DISPATCH → TENDERS → SCHEDULED → EXECUTION → CONCILIATION
 
 | Substatus | Descripción | Acciones |
 |-----------|-------------|----------|
-| `PROGRAMMED` | Orden confirmada, en espera hasta la fecha de salida | Monitorear calendario, preparar despacho |
-| `DISPATCHED` | Ticket emitido al conductor, unidad en tránsito al origen | Monitorear llegada, coordinar carga |
+| `PROGRAMMED` | Orden confirmada, en espera hasta la fecha de salida (comprometida pero no liberada para ir a origen) | Monitorear calendario, preparar despacho |
+| `DISPATCHED` | Unidad liberada operativamente para dirigirse a origen (no implica movimiento físico confirmado) | Monitorear salida efectiva, coordinar llegada |
+| `EN_ROUTE_TO_ORIGIN` | Unidad en tránsito confirmado hacia el origen (telemetría GPS o evidencia operativa) | Monitorear ETA y coordinación de carga |
 | `AT_ORIGIN` | Unidad llegó al punto de carga (geocerca) | Ejecutar checklist pre-embarque |
 | `LOADING` | Checklist aprobado, carga en proceso | Monitorear temperatura, registrar producto |
 | `OBSERVED` | Fallo en checklist pre-embarque | Resolver, reinspeccionar, o reasignar |
 
 **Transiciones:**
-- `PROGRAMMED` → `DISPATCHED` (ticket emitido el día de la salida)
-- `DISPATCHED` → `AT_ORIGIN` (geocerca de origen)
+- `PROGRAMMED` → `DISPATCHED` (liberación operativa de la unidad para dirigirse a origen)
+- `DISPATCHED` → `EN_ROUTE_TO_ORIGIN` (movimiento confirmado hacia origen)
+- `EN_ROUTE_TO_ORIGIN` → `AT_ORIGIN` (geocerca de origen)
 - `AT_ORIGIN` → `LOADING` (checklist aprobado)
 - `AT_ORIGIN` → `OBSERVED` (checklist fallido)
 - `LOADING` → `EXECUTION/IN_TRANSIT` (BOL emitido, unidad sale)
@@ -137,21 +141,23 @@ Al cancelarse, la orden mantiene la etapa donde estaba al momento de la cancelac
 ## Flujo Visual Completo
 
 ```
-DISPATCH             TENDERS           SCHEDULED           EXECUTION         CONCILIATION
-┌────────────┐      ┌───────────┐     ┌─────────────┐     ┌──────────────┐  ┌──────────────┐
-│  NEW       ├─────►│ PENDING   ├────►│ PROGRAMMED  ├────►│ IN_TRANSIT   ├─►│PENDING_AUDIT │
-│            │      │           │     │             │     │              │  │              │
-│ UNASSIGNED │◄─┐   │ ACCEPTED  │     │ DISPATCHED  │     │AT_DESTINATION│  │ UNDER_REVIEW │
-│            │  │   │           │     │             │     │              │  │              │
-│ ASSIGNED   │  ├───┤ REJECTED  │     │ AT_ORIGIN   │     │ DELIVERED   ─┼─►│ DISPUTED     │
-│            │  │   │           │     │             │     │              │  │              │
-│            │  ├───┤ EXPIRED   │     │ LOADING  ◄──┤     │              │  │ APPROVED     │
-│            │  │   │           │     │             │     │              │  │              │
-└────────────┘  ├───┤           │     │ OBSERVED ───┤     └──────────────┘  │ CLOSED       │
-                │   └───────────┘     └─────────────┘                      └──────────────┘
-                └─── (return to UNASSIGNED)
-                     OBSERVED → LOADING (resolved)
-                     OBSERVED → AT_ORIGIN (re-inspect)
+
+DISPATCH             TENDERS           SCHEDULED                 EXECUTION         CONCILIATION
+┌────────────┐      ┌───────────┐     ┌──────────────────┐     ┌──────────────┐  ┌──────────────┐
+│  NEW       ├─────►│ PENDING   ├────►│ PROGRAMMED       │     │ IN_TRANSIT   ├─►│PENDING_AUDIT │
+│            │      │           │     │                  │     │              │  │              │
+│ UNASSIGNED │◄─┐   │ ACCEPTED  │     │ DISPATCHED       │     │AT_DESTINATION│  │ UNDER_REVIEW │
+│            │  │   │           │     │                  │     │              │  │              │
+│ ASSIGNED   │  ├───┤ REJECTED  │     │ EN_ROUTE_TO_ORIGIN│     │ DELIVERED   ─┼─►│ DISPUTED     │
+│            │  │   │           │     │                  │     │              │  │              │
+│            │  ├───┤ EXPIRED   │     │ AT_ORIGIN        │     │              │  │ APPROVED     │
+│            │  │   │           │     │                  │     │              │  │              │
+└────────────┘  ├───┤           │     │ LOADING   ◄──────┤     └──────────────┘  │ CLOSED       │
+│   └───────────┘     │ OBSERVED ────────┤                      └──────────────┘
+└─── (return to UNASSIGNED)
+OBSERVED → LOADING (resolved)
+OBSERVED → AT_ORIGIN (re-inspect)
+
 ```
 
 ---
@@ -167,15 +173,16 @@ DISPATCH             TENDERS           SCHEDULED           EXECUTION         CON
 | 3 | Feb 11 09:00 | TENDERS | PENDING | "Enviar al Transportista" — TTL 24h | María |
 | 4 | Feb 11 14:00 | TENDERS | ACCEPTED | Carrier confirma, firma declaración | Carlos (carrier) |
 | 5 | Feb 12 06:00 | SCHEDULED | PROGRAMMED | Orden confirmada, en espera | Sistema |
-| 6 | Feb 12 07:00 | SCHEDULED | DISPATCHED | Ticket emitido al conductor | María |
-| 7 | Feb 12 08:30 | SCHEDULED | AT_ORIGIN | Unidad en planta (geocerca) | GPS |
-| 8 | Feb 12 09:00 | SCHEDULED | LOADING | Checklist OK, carga inicia | Inspector |
-| 8 | Feb 12 10:30 | EXECUTION | IN_TRANSIT | BOL emitido, unidad sale | Inspector |
-| 9 | Feb 12 18:00 | EXECUTION | AT_DESTINATION | Llega a Cochabamba (geocerca) | GPS |
-| 10 | Feb 12 19:00 | EXECUTION | DELIVERED | POD firmado, fotos capturadas | Receptor |
-| 11 | Feb 12 19:01 | CONCILIATION | PENDING_AUDIT | Auditoría automática inicia | Sistema |
-| 12 | Feb 12 19:05 | CONCILIATION | APPROVED | Sin discrepancias | Sistema |
-| 13 | Feb 15 10:00 | CONCILIATION | CLOSED | Factura generada | Billing |
+| 6 | Feb 12 07:00 | SCHEDULED | DISPATCHED | Unidad liberada para dirigirse a origen | María |
+| 7 | Feb 12 07:45 | SCHEDULED | EN_ROUTE_TO_ORIGIN | Movimiento confirmado hacia origen | GPS |
+| 8 | Feb 12 08:30 | SCHEDULED | AT_ORIGIN | Unidad en planta (geocerca) | GPS |
+| 9 | Feb 12 09:00 | SCHEDULED | LOADING | Checklist OK, carga inicia | Inspector |
+| 10 | Feb 12 10:30 | EXECUTION | IN_TRANSIT | BOL emitido, unidad sale | Inspector |
+| 11 | Feb 12 18:00 | EXECUTION | AT_DESTINATION | Llega a Cochabamba (geocerca) | GPS |
+| 12 | Feb 12 19:00 | EXECUTION | DELIVERED | POD firmado, fotos capturadas | Receptor |
+| 13 | Feb 12 19:01 | CONCILIATION | PENDING_AUDIT | Auditoría automática inicia | Sistema |
+| 14 | Feb 12 19:05 | CONCILIATION | APPROVED | Sin discrepancias | Sistema |
+| 15 | Feb 15 10:00 | CONCILIATION | CLOSED | Factura generada | Billing |
 
 ---
 

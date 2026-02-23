@@ -1,577 +1,305 @@
 # 📘 ColdSync Orders
-
 ## Capa de Compromiso Operativo del Carrier (Carrier Commitment Layer)
 
 ---
 
-## 1. Naturaleza del Sistema
+# PARTE I — Contexto y Propósito
 
-### 1.1 Qué es ColdSync Orders
+## 1. Qué es ColdSync Orders
 
 ColdSync Orders es la **capa de compromiso operativo** entre Shippers y Carriers dentro de ColdSync.
 
 Su propósito es transformar una **intención de transporte** generada en Dispatch en un **compromiso operativo explícito, verificable y auditable** por parte de un Carrier para ejecutar un servicio específico bajo condiciones definidas.
 
-ColdSync Orders:
-
-* No planifica carriles (lanes)
-* No planifica rutas
-* No selecciona carriles
-* No ejecuta despacho
-* No monitorea viajes
-* No gestiona configuraciones de fleet
-* No actúa como torre de control
-
-ColdSync Orders existe exclusivamente para responder:
-
-> ¿Existe o no existe un compromiso operativo válido de este carrier para ejecutar este servicio, en esta fecha, bajo estas condiciones?
-
----
-
-### 1.2 Qué problema resuelve
-
-En operaciones Line Haul contractuales:
-
-* Existen contratos
-* Existen tarifas
-* Existen reglas de asignación
-* Existen capacidades teóricas
-
-Pero nada de eso equivale a un **sí operativo explícito**.
-
-ColdSync Orders introduce una capa formal de **perfeccionamiento del compromiso**:
+El problema que resuelve: en operaciones Line Haul contractuales existen contratos, tarifas, reglas de asignación y capacidades teóricas — pero nada de eso equivale a un **sí operativo explícito**. Orders introduce una capa formal de perfeccionamiento del compromiso:
 
 **Intención → Solicitud Formal → Decisión Explícita → Compromiso Registrado**
 
 Sin este paso, toda planificación es solamente proyección.
 
----
+## 2. Qué NO es Orders — y scope del módulo
 
-### 1.3 Qué NO es ColdSync Orders
+Orders existe exclusivamente para responder:
 
-* No es un módulo de planificación
-* No es un sistema de ejecución
-* No es un marketplace
-* No es un motor de negociación
+> ¿Existe o no existe un compromiso operativo válido de este carrier para ejecutar este servicio, en esta fecha, bajo estas condiciones?
 
-Es una **capa de toma de compromiso**.
+No es un módulo de planificación, ejecución, marketplace ni motor de negociación. No ejecuta, despacha, monitorea la ejecución en ruta (dominio `EXECUTION`), concilia, genera reportes, facturas ni cierres.
 
----
+Orders cubre dos momentos del compromiso: la decisión explícita en `TENDERS` y la continuidad operativa post-aceptación en `SCHEDULED` para seguimiento del carrier y gestión de excepciones (incluyendo `Fail After Accept`).
 
-## 2. Relación Conceptual: Dispatch vs Orders
+Resultados posibles del proceso de tender:
 
-### Dispatch (Shipper-Facing)
+- **Con compromiso creado:** puede **cumplirse** (transferencia a `SCHEDULED/PROGRAMMED`) o **romperse** vía `Fail After Accept` (incluyendo `SCHEDULED/OBSERVED` no resuelto).
+- **Sin compromiso creado:** puede **terminar sin compromiso** por rechazo (`TENDERS/REJECTED`) o expiración (`TENDERS/EXPIRED`).
 
-* Construye la intención del servicio (Orders)
-* Define condiciones operativas
-* Selecciona carrier objetivo
-* Emite tender
+## 3. Relación con Dispatch
 
-### Orders (Carrier-Facing)
+**Dispatch** construye la intención del servicio, define condiciones operativas, selecciona el carrier objetivo y emite el tender.
 
-* Recibe tender
-* Valida factibilidad operativa
-* Emite decisión explícita
-* Registra compromiso o ausencia de compromiso
+**Orders** recibe el tender, valida factibilidad operativa, emite decisión explícita y registra el compromiso o su ausencia.
 
-**Dispatch gobierna intención.**
-**Orders gobierna compromiso.**
+> **Dispatch gobierna intención. Orders gobierna compromiso.**
 
-### 2.1 Prioridad Operativa (Relación con Dispatch)
+### Prioridad operativa
 
-La prioridad operativa de atención se define en Dispatch y se proyecta en Orders como señal de trabajo.
+La prioridad de atención se define y calcula en Dispatch; Orders la consume como señal de trabajo para la bandeja del carrier. Orders no redefine el motor de prioridad ni altera el ownership del compromiso.
 
-Regla conceptual:
+Fuente canónica: [ColdSync Dispatch — Priorización operativa](./dispatch.md#24-priorización-operativa)
 
-* Dispatch calcula prioridad efectiva en función de `stage + substatus` y riesgo temporal.
-* Orders puede mostrar bucket visual (`CRITICA`, `ALTA`, `MEDIA`, `BAJA`) para priorizar bandeja del carrier.
-* Orders no redefine el motor de prioridad ni altera ownership de compromiso.
+### Ownership de TTL y post-aceptación
 
-Implicación:
-
-* La prioridad puede variar durante `DISPATCH`, `TENDERS` y `SCHEDULED` en el flujo global, pero en Orders se consume como señal derivada para la bandeja de trabajo del carrier.
-* En Orders, la prioridad guía atención de tenders, pero la decisión de compromiso sigue siendo:
-  * Accept
-  * Accept with Changes
-  * Decline
-  * Expired
-
-Fuente canónica del modelo de priorización:
-
-* [ColdSync Dispatch](./dispatch.md#7-política-de-priorización)
+- La **política de TTL** (ventanas y criterio de negocio) es definida por el shipper en Dispatch.
+- Orders aplica esa política en runtime: gestiona `TENDERS/PENDING` y transiciona a `TENDERS/EXPIRED` cuando corresponde. No redefine la política.
+- Orders gobierna la decisión de compromiso (`ACCEPTED` / `REJECTED` / `EXPIRED`) y su trazabilidad.
+- El cumplimiento de arribo y pre-embarque posterior a `ACCEPTED` pertenece al dominio `SCHEDULED`; Orders consume esos substatus para seguimiento de compromisos del carrier.
+- Si existe imposibilidad de cumplimiento tras aceptar, se registra `Fail After Accept` y la orden vuelve a `DISPATCH/UNASSIGNED`.
 
 ---
 
-## 3. Objeto Conceptual Central: Tender
+# PARTE II — Modelo Conceptual
+
+## 4. El Tender
 
 Un Tender es una **solicitud formal de compromiso** enviada a un carrier específico para un servicio concreto.
 
-El Tender puede contener un Fleetset sugerido por Dispatch.
-Dicho Fleetset no constituye asignación, sino recomendación inicial.
+| Propiedad | Descripción |
+|-----------|-------------|
+| Carrier destino | Único — un tender, un carrier |
+| Condiciones del servicio | Origen, destino, fecha, ventana, perfil térmico, peso |
+| Fleetset sugerido | Recomendación inicial de Dispatch; no es asignación final |
+| Vigencia | TTL obligatorio; sin decisión en ventana → `EXPIRED` |
+| Decisión requerida | Explícita — sin decisión no hay compromiso |
 
-Propiedades:
+> Mientras un tender no tenga decisión, no existe compromiso operativo.
 
-* Carrier destino único
-* Condiciones claras del servicio
-* Vigencia temporal (TTL)
-* Requiere decisión explícita
+Solo puede existir **un tender activo por servicio**. Si expira, cualquier acción posterior del carrier es ignorada. Si el shipper re-tenderiza, el tender previo queda cerrado. Esto evita dobles compromisos.
 
-Mientras un tender no tenga decisión:
+## 5. Política de TTL
 
-> No existe compromiso operativo.
-
----
-
-## 4. Decisiones del Carrier
-
-### 4.1 Accept
-
-El carrier confirma que ejecutará el servicio bajo los términos recibidos.
-
-Resultado:
-**Se crea un compromiso operativo.**
-
----
-
-### 4.2 Accept with Changes
-
-El carrier confirma que ejecutará el servicio proponiendo **únicamente sustitución de recursos propios** (Fleetsets):
-
-* Vehículo
-* Conductor
-* Trailer
-
-No se permiten cambios en:
-
-* Origen
-* Destino
-* Fecha
-* Hora
-* Producto
-* Perfil térmico
-* Peso
-
-Resultado:
-**Se crea compromiso operativo con recursos sustituidos.**
-
-Este evento **no edita un compromiso existente**.
-Es una forma alternativa de creación de compromiso.
-
----
-
-### 4.2.1 Declaración de Recursos mediante Fleetsets (Resource Declaration)
-
-En ColdSync, los recursos operativos del carrier se modelan como **Fleetsets**, compuestos por:
-
-**Conductor + Vehículo + Remolque**
-
-También existen vehículos rígidos (sin remolque). En ese caso, un Fleetset puede ser:
-
-**Conductor + Vehículo**
-
-ColdSync Orders:
-
-* No crea Fleetsets
-* No administra Fleetsets
-* No edita Fleetsets
-
-Orders solo consume Fleetsets previamente definidos en el módulo de Fleet del carrier.
-
-El compromiso operativo siempre queda asociado a:
-
-> Un carrier **y** un Fleetset declarado.
-
----
-
-#### Fleetset asignado desde Dispatch
-
-El Tender puede llegar a Orders con un Fleetset ya asignado o sugerido por Dispatch, debido a esquemas de flota dedicada o contratada visibles para el shipper.
-
-Este Fleetset:
-
-* No constituye asignación final
-* Representa una recomendación inicial
-
----
-
-#### Recomendación de Fleetsets compatibles
-
-Si el carrier necesita sustituir el Fleetset recibido:
-
-* Orders consulta los Fleetsets activos existentes del carrier (gestionados en Fleet)
-* Orders muestra únicamente Fleetsets existentes que ya cumplen con las condiciones de la orden
-
-Orders no crea ni arma Fleetsets.
-
----
-
-#### Selección del Fleetset
-
-Durante **Accept** o **Accept with Changes**:
-
-1. Orders muestra Fleetsets compatibles
-2. El carrier selecciona uno
-3. El sistema valida nuevamente compatibilidad
-4. Se registra el compromiso junto con el Fleetset elegido
-
-ColdSync **no elige** el Fleetset por el carrier.
-
----
-
-#### Regla de Responsabilidad
-
-* ColdSync valida compatibilidad
-* El carrier decide qué Fleetset usar
-* El carrier asume responsabilidad sobre esa elección
-
----
-
-#### Relación con “Accept” y “Accept with Changes”
-
-Ambos representan creación de compromiso con declaración de Fleetset.
-
-La diferencia es solo de experiencia de usuario:
-
-* **Accept** → selecciona Fleetset sugerido o visible
-* **Accept with Changes** → selecciona Fleetset alternativo
-
-En ambos casos:
-
-> El compromiso se crea con un Fleetset declarado.
-
----
-
-#### Inmutabilidad del Fleetset Declarado
-
-Una vez creado el compromiso:
-
-* El Fleetset asociado no puede cambiarse
-
-Si el carrier necesita usar otro Fleetset:
-
-Se debe declarar **Fail After Accept** y crear un nuevo tender.
-
-Esto preserva:
-
-* Trazabilidad
-* Auditoría
-* Métricas reales
-
----
-
-### 4.2.2 Principio Operativo de Sustitución de Recursos
-
-ColdSync Orders **no soporta reasignación de recursos dentro de un compromiso existente**.
-
-La sustitución de recursos ocurre únicamente:
-
-* Durante la creación del compromiso (Accept / Accept with Changes)
-
-Cualquier cambio posterior se considera:
-
-**Ruptura de compromiso.**
-
----
-
-### 4.2.3 Reemplazo Controlado Post-Aceptación (Replacement Event - Recomendación)
-
-[Inferencia] En sistemas TMS enterprise, el patrón común no es “editar” un compromiso, sino registrar un **evento de reemplazo** auditado antes del handoff a ejecución.
-
-Para alinear ColdSync con esa práctica sin perder la certeza contractual, se recomienda soportar un reemplazo controlado bajo reglas estrictas.
-
-**Principio:** No se edita el compromiso. Se registra un evento auditable asociado al compromiso.
-
-**Condiciones mínimas recomendadas:**
-
-* Solo permitido **antes del handoff** (antes de “Cerrado por Handoff”)
-* Solo puede seleccionarse un Fleetset dentro de los Fleetsets compatibles mostrados
-* Requiere **motivo tipificado**
-* Requiere auditoría: quién, cuándo, qué Fleetset saliente, qué Fleetset entrante
-* Límite recomendado: **máximo 1 o 2 reemplazos** por compromiso
-
-**Implicación conceptual:**
-
-* El compromiso sigue siendo válido
-* Se mantiene la trazabilidad de recursos
-* Se evita re-tender innecesario por eventos operativos frecuentes
-
-**Regla de degradación:**
-
-Si no existe Fleetset compatible disponible para reemplazo, o se excede el límite permitido:
-
-* **Fail After Accept** y re-tender
-
----
-
-### 4.3 Decline
-
-El carrier declara imposibilidad de ejecutar.
-
-Motivos tipificados (ejemplos):
-
-* Falla de equipo de frío
-* Falta de conductor certificado
-* Incompatibilidad sanitaria de carga previa
-
-Resultado:
-**No existe compromiso.**
-
----
-
-### 4.4 No Response (Expired)
-
-El TTL vence sin decisión.
-
-Resultado:
-**No existe compromiso.**
-
----
-
-### 4.5 Fail After Accept
-
-El carrier había creado compromiso, pero posteriormente declara imposibilidad.
-
-Resultado:
-**Ruptura de compromiso.**
-Genera evento auditable y base para penalidad.
-
----
-
-### 4.6 Observed (Falla Física en Origen)
-
-El carrier llegó a planta bajo compromiso válido, pero la unidad falla checklist físico.
-
-Resultado:
-**Ruptura de compromiso por incumplimiento de declaración.**
-
----
-
-## 5. Estados Conceptuales del Compromiso
-
-Orders gestiona **estados de compromiso**, no estados de viaje.
-
-En el modelo de [Gestión de Estados](./state-orders.md), Orders corresponde a la **etapa TENDERS**:
-
-| Estado Conceptual | Stage/Substatus | Descripción |
-|---|---|---|
-| No Solicitado | `DISPATCH/ASSIGNED` | Orden asignada pero no enviada al carrier |
-| Solicitado (Tender Pendiente) | `TENDERS/PENDING` | TTL activo, esperando decisión del carrier |
-| Comprometido | `TENDERS/ACCEPTED` | Carrier confirmó — compromiso creado |
-| Rechazado | `TENDERS/REJECTED` | Carrier declinó — retorna a `DISPATCH/UNASSIGNED` |
-| Vencido | `TENDERS/EXPIRED` | TTL venció sin respuesta — retorna a `DISPATCH/UNASSIGNED` |
-| Roto por Observación | `SCHEDULED/OBSERVED` | Unidad falló checklist en planta |
-| Cerrado por Handoff | `SCHEDULED/PROGRAMMED` | Compromiso transferido a ejecución |
-
-> "Cerrado por Handoff" significa que el compromiso fue exitosamente transferido a la etapa SCHEDULED.
-> No significa que Orders ejecuta el viaje.
-
----
-
-## 6. Rol del Tiempo (TTL)
-
-Todo tender posee TTL obligatorio.
-
-Si expira:
-
-* Se marca Expired
-* Se considera ausencia de compromiso
-* Pasa a Dispatch nuevamente como una rechazada/sin asignar y puede emitir nuevo tender de esta orden.
-
----
-
-### 6.1 Política de TTL Dinámico
-
-El TTL se calcula según **diferencia entre fecha/hora de tender y fecha/hora de pickup**.
-
-* Pickup mismo día o siguiente: 90 minutos
-* Pickup en 2–3 días: 24 horas
-* Pickup en 4–7 días: 48 horas
-* Pickup >7 días: 72 horas
-
-**Regla:**
-El TTL corre en tiempo calendario continuo (24/7) usando timezone de la organización.
 La duración contractual del TTL es canónica en Dispatch y se consume sin reinterpretación en Orders.
 
-### 6.2 Ownership del TTL
+| Anticipación de pickup | TTL |
+|------------------------|-----|
+| Mismo día o siguiente | 90 minutos |
+| 2–3 días | 24 horas |
+| 4–7 días | 48 horas |
+| Más de 7 días | 72 horas |
 
-- La **política de TTL** (ventanas y criterio de negocio) es definida por el shipper en Dispatch.
-- Orders aplica esa política en runtime para gestionar `TENDERS/PENDING` y transicionar a `TENDERS/EXPIRED` cuando corresponde.
-- Orders no redefine unilateralmente la política de TTL.
+El TTL corre en tiempo calendario continuo (24/7) usando el timezone de la organización.
 
-### 6.3 Ownership post-aceptación
+## 6. Fleetsets — Declaración de Recursos
 
-- Orders gobierna la decisión de compromiso (`ACCEPTED/REJECTED/EXPIRED`) y su trazabilidad.
-- El cumplimiento de arribo y pre-embarque posterior a `ACCEPTED` pertenece al dominio `SCHEDULED`.
-- Si existe imposibilidad de cumplimiento después de aceptar, se registra `Fail After Accept` y la orden vuelve a `DISPATCH/UNASSIGNED` para reorquestación.
+En ColdSync, los recursos operativos del carrier se modelan como **Fleetsets**: `Conductor + Vehículo + Remolque` (o `Conductor + Vehículo` para vehículos rígidos sin remolque).
 
----
+| Regla | Detalle |
+|-------|---------|
+| Orders no crea ni administra Fleetsets | Solo consume los definidos en el módulo Fleet del carrier |
+| Todo compromiso queda asociado a un Fleetset declarado | Carrier + Fleetset es la unidad mínima de compromiso |
+| El Fleetset sugerido por Dispatch no es asignación | Es recomendación inicial; el carrier selecciona el definitivo |
+| Orders muestra solo Fleetsets compatibles | Los que ya cumplen las condiciones de la orden |
+| ColdSync valida compatibilidad; el carrier decide | El carrier asume responsabilidad sobre su elección |
+| El Fleetset declarado es inmutable post-compromiso | Si el carrier necesita cambiarlo: `Fail After Accept` + nuevo tender |
 
-## 7. Comportamiento ante concurrencia
+La diferencia entre **Accept** y **Accept with Changes** es solo de experiencia de usuario: en ambos casos el compromiso se crea con un Fleetset declarado. Accept with Changes permite seleccionar un Fleetset alternativo al sugerido.
 
-* Solo un tender activo por servicio
-* Si un tender expira, cualquier acción posterior del carrier es ignorada
-* Si el shipper re-tenderiza, el tender previo queda cerrado
+## 7. Modelo de estados del compromiso
 
-Esto evita dobles compromisos.
+El modelo de Orders integra decisión de compromiso en **TENDERS** y seguimiento de compromisos del carrier en **SCHEDULED** (sin cambiar el ownership operativo de `SCHEDULED`).
 
----
+| Estado conceptual | Stage / Substatus | Descripción |
+|-------------------|-------------------|-------------|
+| No solicitado | `DISPATCH/ASSIGNED` | Orden asignada pero no enviada al carrier |
+| Solicitado | `TENDERS/PENDING` | TTL activo, esperando decisión |
+| Comprometido | `TENDERS/ACCEPTED` | Carrier confirmó — compromiso creado |
+| Compromiso en seguimiento | `SCHEDULED/PROGRAMMED` → `SCHEDULED/DISPATCHED` → `SCHEDULED/EN_ROUTE_TO_ORIGIN` → `SCHEDULED/AT_ORIGIN` → `SCHEDULED/LOADING` | Compromiso activo del carrier en post-aceptación |
+| Rechazado | `TENDERS/REJECTED` | Carrier declinó — retorna a `DISPATCH/UNASSIGNED` |
+| Vencido | `TENDERS/EXPIRED` | TTL venció sin respuesta — retorna a `DISPATCH/UNASSIGNED` |
+| Observado en origen | `SCHEDULED/OBSERVED` | Unidad falló checklist en planta; requiere corrección o ruptura |
 
-## 8. Traducción a UI
+> Tras `TENDERS/ACCEPTED`, la orden pasa a `SCHEDULED/PROGRAMMED`. Orders puede mostrar seguimiento del compromiso del carrier durante `SCHEDULED`, pero no redefine la gobernanza de esa etapa.
+> `Observed` es un resultado operativo del dominio `SCHEDULED` (no una decisión de `TENDERS`), incluido aquí solo para completar el ciclo del compromiso.
 
-Acciones visibles:
-
-* Aceptar
-* Aceptar con cambios
-* Rechazar
-
-Expired, Fail After Accept y Observed son resultados sistémicos.
-
----
-
-## 9. Alcance Real de Orders
-
-ColdSync Orders:
-
-* Registra creación de compromiso
-* Registra rupturas de compromiso
-* Registra cierre por handoff
-
-No:
-
-* Ejecuta
-* Despacha
-* Monitorea
-* Concilia
-* Genera reportes
-* Genera facturas
-* Genera cierres
+Referencia completa: [Gestión de Estados](./state-orders.md)
 
 ---
 
-## 10. Inmutabilidad del Compromiso
+# PARTE III — Decisiones del Carrier y Resultados Operativos
 
-Una vez creado:
+## 8. Mapa de decisiones
 
-* No se edita
-* No se reemplaza
+| Decisión | Trigger | Resultado | Crea compromiso |
+|----------|---------|-----------|-----------------|
+| **Accept** | Carrier confirma ejecución bajo términos recibidos | `TENDERS/ACCEPTED` | ✅ Sí |
+| **Accept with Changes** | Carrier confirma con Fleetset alternativo propio | `TENDERS/ACCEPTED` | ✅ Sí |
+| **Decline** | Carrier declara imposibilidad de ejecutar | `TENDERS/REJECTED` | ❌ No |
+| **No Response** | TTL vence sin decisión | `TENDERS/EXPIRED` | ❌ No |
+| **Fail After Accept** | Carrier declara imposibilidad después de `TENDERS/ACCEPTED`, mientras la orden está en `SCHEDULED` (`PROGRAMMED`, `DISPATCHED`, `EN_ROUTE_TO_ORIGIN`, `AT_ORIGIN`, `LOADING` u `OBSERVED` no resuelto) | Evento de ruptura + retorno a `DISPATCH/UNASSIGNED` | — |
+| **Observed** (resultado operativo) | Unidad falla checklist físico en origen | `SCHEDULED/OBSERVED` | — |
 
-Solo puede:
+## 9. Accept
 
-* Cumplirse
-* Romperse
-* Cerrarse por handoff
+El carrier confirma que ejecutará el servicio bajo los términos recibidos, seleccionando el Fleetset correspondiente.
 
----
+**Resultado:** se crea un compromiso operativo.
 
-## 11. Principio Rector
+## 10. Accept with Changes
 
-ColdSync Orders optimiza **certeza**, no optimización.
+El carrier confirma ejecución proponiendo **únicamente sustitución de recursos propios** (Fleetset: vehículo, conductor, remolque).
 
-No optimiza:
+No se permiten cambios en: origen, destino, fecha, hora, producto, perfil térmico ni peso.
 
-* Costos
-* Kilómetros
-* Rutas
-* Tiempos
+**Resultado:** se crea compromiso operativo con recursos sustituidos. No es edición de un compromiso existente — es una forma alternativa de creación.
 
-Optimiza:
+> ColdSync no elige el Fleetset por el carrier. El sistema valida compatibilidad; el carrier decide y asume responsabilidad.
 
-> Confiabilidad contractual de ejecución.
+**Principio operativo de sustitución de recursos:** Orders no soporta reasignación de recursos dentro de un compromiso existente. La sustitución ocurre únicamente durante la creación del compromiso. Cualquier cambio posterior se considera ruptura.
 
----
+## 11. Decline
 
-## 12. Modelo Final
+El carrier declara imposibilidad de ejecutar con motivo tipificado.
 
-**Intención → Tender → Decisión → Compromiso → (Cumplido | Roto | Cerrado)**
+Motivos de ejemplo: falla de equipo de frío, falta de conductor certificado, incompatibilidad sanitaria de carga previa.
 
-> **Referencia completa:** Ver [Gestión de Estados](./state-orders.md) para el modelo global de 5 etapas y cómo TENDERS se relaciona con DISPATCH, SCHEDULED, EXECUTION y CONCILIATION.
+**Resultado:** no existe compromiso. La orden retorna a `DISPATCH/UNASSIGNED`.
 
----
+## 12. No Response (Expired)
 
-## 13. Experiencia Operativa (UX) de Orders
+El TTL vence sin decisión del carrier.
 
-### 13.1 Bandeja Principal
+**Resultado:** no existe compromiso. La orden retorna a `DISPATCH/UNASSIGNED`. Toda acción posterior del carrier sobre ese tender es ignorada.
 
-Orders funciona como una **bandeja de trabajo del carrier** que muestra únicamente tenders activos sin decisión.
+## 13. Fail After Accept
 
-Cada fila representa:
+El carrier había creado compromiso pero posteriormente declara imposibilidad de cumplimiento.
 
-> Una solicitud de compromiso pendiente.
+- **Precondición obligatoria:** la orden ya pasó por `TENDERS/ACCEPTED`.
+- **Contexto operativo:** se declara en post-aceptación cuando la orden está en `SCHEDULED` (antes de `EXECUTION`).
+- **Causales válidas:** imposibilidad operativa del carrier, incluyendo `SCHEDULED/OBSERVED` no resuelto en ventana.
+- Es una acción explícita del carrier registrada por el sistema.
+- Genera evento auditable y base para penalidad.
+- No crea substatus adicional en TENDERS.
+- **Resultado:** ruptura de compromiso y retorno a `DISPATCH/UNASSIGNED` para reorquestación.
 
----
+## 14. Observed (Falla física en origen)
 
-### 13.2 Clasificación Visual
+El carrier llegó a planta bajo compromiso válido, pero la unidad falla el checklist físico.
 
-Las órdenes se agrupan y filtran por:
+**Resultado:** la orden pasa a `SCHEDULED/OBSERVED` como excepción operativa.
 
-* Hoy
-* Mañana
-* Próximos 2–3 días
-* Futuras (>3 días)
-* Expiran pronto
-* Vencidas
-
-No se crean estados nuevos.
-
----
-
-### 13.3 Urgencia
-
-Derivada del TTL restante:
-
-* Crítica (`<= 2h` o vencido)
-* Alta (`> 2h y <= 6h`)
-* Media (`> 6h y <= 24h`)
-* Baja (`> 24h`)
+- Si la observación se corrige en ventana, continúa el flujo en `SCHEDULED/LOADING`.
+- Si no se corrige en ventana, se registra ruptura vía `Fail After Accept` y retorno a `DISPATCH/UNASSIGNED`.
 
 ---
 
-### 13.4 Prioridad
+# PARTE IV — Bandeja Operativa (Carrier UX)
 
-Campo derivado y enviado desde Dispatch:
+## 15. Bandeja principal
 
-* Crítica
-* Alta
-* Media
-* Baja
+Orders funciona como una **bandeja de trabajo del carrier** organizada en tres tabs:
 
-Orders solo muestra este valor y no redefine su cálculo.
+- **Pendientes:** `TENDERS/PENDING`.
+- **Mis Compromisos:** `TENDERS/ACCEPTED` y estados `SCHEDULED` activos del compromiso (`PROGRAMMED`, `DISPATCHED`, `EN_ROUTE_TO_ORIGIN`, `AT_ORIGIN`, `LOADING`, `OBSERVED`), solo como vista de seguimiento del carrier.
+- **Historial:** resultados sin compromiso (`TENDERS/REJECTED`, `TENDERS/EXPIRED`) y rupturas post-aceptación registradas (`Fail After Accept` / `OBSERVED` no resuelto).
 
----
+### Usuarios objetivo
 
-### 13.5 Ordenamiento Recomendado
+- Despachador del carrier
+- Planner del carrier
+- Coordinador de flota
+- Supervisor operativo
 
-Para bandeja de Orders (`TENDERS/PENDING`), mantener orden determinístico alineado a Dispatch:
+El conductor no interactúa con Orders.
+
+## 16. Clasificación y filtros
+
+Las órdenes se agrupan y filtran por horizonte temporal:
+
+| Grupo | Criterio |
+|-------|----------|
+| Hoy | Pickup en el día actual |
+| Mañana | Pickup día siguiente |
+| Próximos 2–3 días | Pickup en ese rango |
+| Futuras | Pickup > 3 días |
+| Expiran pronto | TTL bajo umbral de alerta |
+| Vencidas | TTL expirado sin decisión |
+
+No se crean estados nuevos para estos agrupadores; son vistas del mismo conjunto de datos.
+
+## 17. Urgencia y prioridad
+
+**Urgencia** — derivada del TTL restante:
+
+| TTL restante | Urgencia |
+|-------------|----------|
+| ≤ 2h o vencido | Crítica |
+| > 2h y ≤ 6h | Alta |
+| > 6h y ≤ 24h | Media |
+| > 24h | Baja |
+
+**Prioridad** — campo derivado enviado desde Dispatch (`CRÍTICA` / `ALTA` / `MEDIA` / `BAJA`). Orders muestra este valor; no redefine su cálculo.
+
+## 18. Ordenamiento determinístico
+
+Para la bandeja de pendientes de Orders (`TENDERS/PENDING`), ordenamiento alineado a Dispatch:
 
 1. Urgencia TTL
 2. `priority_effective` desc
-3. Menor holgura temporal (`response_deadline - now`) asc
+3. Menor holgura temporal (`response_deadline − now`) asc
 4. `planned_start_at` asc
 5. `created_at` asc (FIFO)
 
+Para `Mis Compromisos`, el orden recomendado prioriza riesgo operativo en `SCHEDULED`:
+
+1. `OBSERVED` primero
+2. Menor holgura temporal al hito comprometido (`ETA at Origen` / `planned_start_at`)
+3. `planned_start_at` asc
+4. `created_at` asc (FIFO)
+
+## 19. Acciones masivas
+
+| Acción | Condición |
+|--------|-----------|
+| Decline múltiple | Permitida |
+| Accept múltiple | Solo si cada orden tiene Fleetset declarado explícitamente |
+| Accept with Changes masivo | No recomendado |
+
 ---
 
-### 13.6 Usuarios Objetivo
+# PARTE V — Gobernanza y Principio Rector
 
-* Despachador del carrier
-* Planner del carrier
-* Coordinador de flota
-* Supervisor operativo
+## 20. Inmutabilidad e integridad del compromiso
 
-El chofer no interactúa con Orders.
+Una vez creado el compromiso:
+
+- No se edita ni reemplaza silenciosamente.
+- El Fleetset declarado no puede cambiarse dentro del compromiso vigente.
+- Toda modificación requiere ruptura explícita (`Fail After Accept`) y emisión de nuevo tender.
+
+Esto preserva trazabilidad, auditoría y métricas reales de cumplimiento.
+
+## 21. Gobernanza y trazabilidad
+
+- **Fuente de verdad:** `stage + substatus`
+- **Una sola máquina de estados** transiciona; no hay cambios paralelos
+- **Toda decisión** se registra con actor, trigger, motivo y timestamp
+- `Fail After Accept` y `Observed` son eventos auditables con base para penalidad contractual
+
+## 22. Principio rector
+
+ColdSync Orders optimiza **certeza operativa**, no eficiencia de ruta ni costo.
+
+> **Intención → Tender → Decisión → Compromiso → (Transferido a `SCHEDULED/PROGRAMMED` | Roto | Terminado sin compromiso)**
+
+La confiabilidad contractual de ejecución es el único output del módulo.
 
 ---
 
-### 13.7 Acciones Masivas
+## Referencias
 
-Permitidas:
+- [ColdSync Dispatch](./dispatch.md)
+- [Gestión de Estados](./state-orders.md)
+- [ColdSync Matching](./matching-orders.md)
 
-* Decline múltiple
+---
 
-Condicionadas:
-
-* Accept múltiple solo si cada orden tiene Fleetset declarado explícitamente
-
-No recomendadas:
-
-* Accept with Changes masivo
+**Última actualización:** Febrero 2026

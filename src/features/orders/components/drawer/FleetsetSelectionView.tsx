@@ -5,7 +5,7 @@ import { Checkbox } from "../../../../components/ui/Checkbox";
 import { Badge } from "../../../../components/ui/Badge";
 import { CancelButton } from "../../../../components/widgets/CancelButton";
 import { PrimaryButton } from "../../../../components/widgets/PrimaryButton";
-import { CarrierOrder } from "../../../../services/database/orders.service";
+import { CarrierOrder, FleetSetWithRelations } from "../../../../services/database/orders.service";
 import { ordersService } from "../../../../services/database/orders.service";
 import { useAppStore } from "../../../../stores/useAppStore";
 import { toast } from "sonner";
@@ -57,16 +57,16 @@ export function FleetsetSelectionView({
 
         // Transform to display format
         // Filter out fleet sets that have active/committed orders
-        const availableFleetSets = data.filter((fs: any) => {
+        const availableFleetSets = data.filter((fs: FleetSetWithRelations) => {
             const orders = fs.orders || [];
-            // Check if has any order in committed status
-            const hasActiveOrder = orders.some((o: any) => 
-                ['ACCEPTED', 'SCHEDULED', 'DISPATCHED', 'AT_DESTINATION'].includes(o.status)
+            // Check if has any order in committed substatus
+            const hasActiveOrder = orders.some((o) => 
+                ['ACCEPTED', 'PROGRAMMED', 'DISPATCHED', 'EN_ROUTE_TO_ORIGIN', 'AT_ORIGIN', 'LOADING'].includes(o.substatus)
             );
             return !hasActiveOrder;
         });
 
-        const displayFleetsets: FleetSetDisplay[] = availableFleetSets.map((fs: any) => ({
+        const displayFleetsets: FleetSetDisplay[] = availableFleetSets.map((fs: FleetSetWithRelations) => ({
           id: fs.id,
           name: `${fs.vehicle?.unit_code || "Unit"} / ${fs.driver?.name || "Driver"}`,
           vehicle: fs.vehicle?.plate || fs.vehicle?.unit_code || "-",

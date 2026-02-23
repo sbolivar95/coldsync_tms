@@ -468,6 +468,7 @@ export type Database = {
           carrier_id: number
           flespi_device_id: number | null
           flespi_device_type_id: number | null
+          has_can: boolean
           id: string
           ident: string
           notes: string | null
@@ -475,14 +476,16 @@ export type Database = {
           phone_number: string | null
           provider: number | null
           serial: string | null
+          temp_mode: string
           tracked_entity_type:
-            | Database["public"]["Enums"]["assigned_type"]
-            | null
+          | Database["public"]["Enums"]["assigned_type"]
+          | null
         }
         Insert: {
           carrier_id: number
           flespi_device_id?: number | null
           flespi_device_type_id?: number | null
+          has_can?: boolean
           id?: string
           ident: string
           notes?: string | null
@@ -490,14 +493,16 @@ export type Database = {
           phone_number?: string | null
           provider?: number | null
           serial?: string | null
+          temp_mode?: string
           tracked_entity_type?:
-            | Database["public"]["Enums"]["assigned_type"]
-            | null
+          | Database["public"]["Enums"]["assigned_type"]
+          | null
         }
         Update: {
           carrier_id?: number
           flespi_device_id?: number | null
           flespi_device_type_id?: number | null
+          has_can?: boolean
           id?: string
           ident?: string
           notes?: string | null
@@ -505,9 +510,10 @@ export type Database = {
           phone_number?: string | null
           provider?: number | null
           serial?: string | null
+          temp_mode?: string
           tracked_entity_type?:
-            | Database["public"]["Enums"]["assigned_type"]
-            | null
+          | Database["public"]["Enums"]["assigned_type"]
+          | null
         }
         Relationships: [
           {
@@ -560,6 +566,110 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      ct_unit_live_state: {
+        Row: {
+          address_text: string | null
+          connection_device_id: string
+          flespi_device_id: number | null
+          heading: number | null
+          id: string
+          ignition: boolean | null
+          is_moving: boolean | null
+          is_online: boolean
+          lat: number | null
+          lng: number | null
+          message_ts: string
+          org_id: string
+          server_ts: string | null
+          signal_age_sec: number | null
+          speed_kph: number | null
+          telematics: Json | null
+          temp_1_c: number | null
+          temp_2_c: number | null
+          temperature_c: number | null
+          trailer_id: string | null
+          updated_at: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          address_text?: string | null
+          connection_device_id: string
+          flespi_device_id?: number | null
+          heading?: number | null
+          id?: string
+          ignition?: boolean | null
+          is_moving?: boolean | null
+          is_online?: boolean
+          lat?: number | null
+          lng?: number | null
+          message_ts: string
+          org_id: string
+          server_ts?: string | null
+          signal_age_sec?: number | null
+          speed_kph?: number | null
+          telematics?: Json | null
+          temp_1_c?: number | null
+          temp_2_c?: number | null
+          temperature_c?: number | null
+          trailer_id?: string | null
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          address_text?: string | null
+          connection_device_id?: string
+          flespi_device_id?: number | null
+          heading?: number | null
+          id?: string
+          ignition?: boolean | null
+          is_moving?: boolean | null
+          is_online?: boolean
+          lat?: number | null
+          lng?: number | null
+          message_ts?: string
+          org_id?: string
+          server_ts?: string | null
+          signal_age_sec?: number | null
+          speed_kph?: number | null
+          telematics?: Json | null
+          temp_1_c?: number | null
+          temp_2_c?: number | null
+          temperature_c?: number | null
+          trailer_id?: string | null
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ct_unit_live_state_connection_device_id_fkey"
+            columns: ["connection_device_id"]
+            isOneToOne: false
+            referencedRelation: "connection_device"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ct_unit_live_state_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ct_unit_live_state_trailer_id_fkey"
+            columns: ["trailer_id"]
+            isOneToOne: false
+            referencedRelation: "trailers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ct_unit_live_state_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       device_assignments_history: {
         Row: {
@@ -908,8 +1018,8 @@ export type Database = {
           penalty_rule_applied: string | null
           reason: string | null
           resolution:
-            | Database["public"]["Enums"]["observance_resolution_type"]
-            | null
+          | Database["public"]["Enums"]["observance_resolution_type"]
+          | null
           resolution_notes: string | null
           resolved_at: string | null
           resolved_by: string | null
@@ -931,8 +1041,8 @@ export type Database = {
           penalty_rule_applied?: string | null
           reason?: string | null
           resolution?:
-            | Database["public"]["Enums"]["observance_resolution_type"]
-            | null
+          | Database["public"]["Enums"]["observance_resolution_type"]
+          | null
           resolution_notes?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
@@ -954,8 +1064,8 @@ export type Database = {
           penalty_rule_applied?: string | null
           reason?: string | null
           resolution?:
-            | Database["public"]["Enums"]["observance_resolution_type"]
-            | null
+          | Database["public"]["Enums"]["observance_resolution_type"]
+          | null
           resolution_notes?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
@@ -1001,8 +1111,8 @@ export type Database = {
           dispatch_order_id: string
           from_stage: Database["public"]["Enums"]["dispatch_order_stage"] | null
           from_substatus:
-            | Database["public"]["Enums"]["dispatch_order_substatus"]
-            | null
+          | Database["public"]["Enums"]["dispatch_order_substatus"]
+          | null
           id: string
           metadata: Json | null
           notes: string | null
@@ -1018,11 +1128,11 @@ export type Database = {
           created_at?: string
           dispatch_order_id: string
           from_stage?:
-            | Database["public"]["Enums"]["dispatch_order_stage"]
-            | null
+          | Database["public"]["Enums"]["dispatch_order_stage"]
+          | null
           from_substatus?:
-            | Database["public"]["Enums"]["dispatch_order_substatus"]
-            | null
+          | Database["public"]["Enums"]["dispatch_order_substatus"]
+          | null
           id?: string
           metadata?: Json | null
           notes?: string | null
@@ -1038,11 +1148,11 @@ export type Database = {
           created_at?: string
           dispatch_order_id?: string
           from_stage?:
-            | Database["public"]["Enums"]["dispatch_order_stage"]
-            | null
+          | Database["public"]["Enums"]["dispatch_order_stage"]
+          | null
           from_substatus?:
-            | Database["public"]["Enums"]["dispatch_order_substatus"]
-            | null
+          | Database["public"]["Enums"]["dispatch_order_substatus"]
+          | null
           id?: string
           metadata?: Json | null
           notes?: string | null
@@ -1646,8 +1756,8 @@ export type Database = {
         }
         Insert: {
           allowed_stop_types?:
-            | Database["public"]["Enums"]["stop_types"][]
-            | null
+          | Database["public"]["Enums"]["stop_types"][]
+          | null
           created_at?: string | null
           description?: string | null
           id?: number
@@ -1656,8 +1766,8 @@ export type Database = {
         }
         Update: {
           allowed_stop_types?:
-            | Database["public"]["Enums"]["stop_types"][]
-            | null
+          | Database["public"]["Enums"]["stop_types"][]
+          | null
           created_at?: string | null
           description?: string | null
           id?: number
@@ -2490,8 +2600,8 @@ export type Database = {
           length_m: number
           load_capacity_quantity: number | null
           load_capacity_type:
-            | Database["public"]["Enums"]["app_load_capacity_type"]
-            | null
+          | Database["public"]["Enums"]["app_load_capacity_type"]
+          | null
           model: string | null
           notes: string | null
           operational_status: Database["public"]["Enums"]["asset_operational_status"]
@@ -2519,8 +2629,8 @@ export type Database = {
           length_m: number
           load_capacity_quantity?: number | null
           load_capacity_type?:
-            | Database["public"]["Enums"]["app_load_capacity_type"]
-            | null
+          | Database["public"]["Enums"]["app_load_capacity_type"]
+          | null
           model?: string | null
           notes?: string | null
           operational_status?: Database["public"]["Enums"]["asset_operational_status"]
@@ -2548,8 +2658,8 @@ export type Database = {
           length_m?: number
           load_capacity_quantity?: number | null
           load_capacity_type?:
-            | Database["public"]["Enums"]["app_load_capacity_type"]
-            | null
+          | Database["public"]["Enums"]["app_load_capacity_type"]
+          | null
           model?: string | null
           notes?: string | null
           operational_status?: Database["public"]["Enums"]["asset_operational_status"]
@@ -2602,8 +2712,8 @@ export type Database = {
           length_m: number | null
           load_capacity_quantity: number | null
           load_capacity_type:
-            | Database["public"]["Enums"]["app_load_capacity_type"]
-            | null
+          | Database["public"]["Enums"]["app_load_capacity_type"]
+          | null
           model: string
           notes: string | null
           odometer_unit: string
@@ -2635,8 +2745,8 @@ export type Database = {
           length_m?: number | null
           load_capacity_quantity?: number | null
           load_capacity_type?:
-            | Database["public"]["Enums"]["app_load_capacity_type"]
-            | null
+          | Database["public"]["Enums"]["app_load_capacity_type"]
+          | null
           model: string
           notes?: string | null
           odometer_unit?: string
@@ -2668,8 +2778,8 @@ export type Database = {
           length_m?: number | null
           load_capacity_quantity?: number | null
           load_capacity_type?:
-            | Database["public"]["Enums"]["app_load_capacity_type"]
-            | null
+          | Database["public"]["Enums"]["app_load_capacity_type"]
+          | null
           model?: string
           notes?: string | null
           odometer_unit?: string
@@ -3512,93 +3622,94 @@ export type Database = {
     }
     Enums: {
       account_status:
-        | "ACTIVE"
-        | "PAST_DUE"
-        | "SUSPENDED"
-        | "CANCELED"
-        | "INACTIVE"
+      | "ACTIVE"
+      | "PAST_DUE"
+      | "SUSPENDED"
+      | "CANCELED"
+      | "INACTIVE"
       app_load_capacity_type:
-        | "PALLET"
-        | "MEAT_HOOK"
-        | "BASKET"
-        | "BOX"
-        | "BIN"
-        | "BULK"
-        | "OTHER"
+      | "PALLET"
+      | "MEAT_HOOK"
+      | "BASKET"
+      | "BOX"
+      | "BIN"
+      | "BULK"
+      | "OTHER"
       asset_operational_status:
-        | "ACTIVE"
-        | "IN_SERVICE"
-        | "IN_MAINTENANCE"
-        | "OUT_OF_SERVICE"
-        | "RETIRED"
-        | "IN_TRANSIT"
+      | "ACTIVE"
+      | "IN_SERVICE"
+      | "IN_MAINTENANCE"
+      | "OUT_OF_SERVICE"
+      | "RETIRED"
+      | "IN_TRANSIT"
       assigned_type: "VEHICLE" | "TRAILER"
       canceled_by_type: "CARRIER" | "ORGANIZATION" | "SYSTEM"
       carrier_assignment_outcome:
-        | "PENDING"
-        | "ACCEPTED"
-        | "REJECTED"
-        | "CANCELED_BY_ORG"
-        | "TIMEOUT"
-        | "REASSIGNED"
-        | "CANCELED_OBSERVED"
+      | "PENDING"
+      | "ACCEPTED"
+      | "REJECTED"
+      | "CANCELED_BY_ORG"
+      | "TIMEOUT"
+      | "REASSIGNED"
+      | "CANCELED_OBSERVED"
       carrier_type: "OWNER" | "THIRD PARTY"
       currency_code: "BOB" | "USD"
       dispatch_order_stage:
-        | "DISPATCH"
-        | "TENDERS"
-        | "SCHEDULED"
-        | "EXECUTION"
-        | "CONCILIATION"
+      | "DISPATCH"
+      | "TENDERS"
+      | "SCHEDULED"
+      | "EXECUTION"
+      | "CONCILIATION"
       dispatch_order_status:
-        | "UNASSIGNED"
-        | "PENDING"
-        | "ASSIGNED"
-        | "REJECTED"
-        | "SCHEDULED"
-        | "AT_DESTINATION"
-        | "DISPATCHED"
-        | "CANCELED"
-        | "OBSERVANCE"
-        | "COMPLETED"
+      | "UNASSIGNED"
+      | "PENDING"
+      | "ASSIGNED"
+      | "REJECTED"
+      | "SCHEDULED"
+      | "AT_DESTINATION"
+      | "DISPATCHED"
+      | "CANCELED"
+      | "OBSERVANCE"
+      | "COMPLETED"
       dispatch_order_substatus:
-        | "NEW"
-        | "UNASSIGNED"
-        | "ASSIGNED"
-        | "PENDING"
-        | "ACCEPTED"
-        | "REJECTED"
-        | "EXPIRED"
-        | "PROGRAMMED"
-        | "DISPATCHED"
-        | "AT_ORIGIN"
-        | "LOADING"
-        | "OBSERVED"
-        | "IN_TRANSIT"
-        | "AT_DESTINATION"
-        | "DELIVERED"
-        | "PENDING_AUDIT"
-        | "UNDER_REVIEW"
-        | "DISPUTED"
-        | "APPROVED"
-        | "CLOSED"
-        | "CANCELED"
+      | "NEW"
+      | "UNASSIGNED"
+      | "ASSIGNED"
+      | "PENDING"
+      | "ACCEPTED"
+      | "REJECTED"
+      | "EXPIRED"
+      | "PROGRAMMED"
+      | "DISPATCHED"
+      | "EN_ROUTE_TO_ORIGIN"
+      | "AT_ORIGIN"
+      | "LOADING"
+      | "OBSERVED"
+      | "IN_TRANSIT"
+      | "AT_DESTINATION"
+      | "DELIVERED"
+      | "PENDING_AUDIT"
+      | "UNDER_REVIEW"
+      | "DISPUTED"
+      | "APPROVED"
+      | "CLOSED"
+      | "CANCELED"
       driver_status: "AVAILABLE" | "INACTIVE" | "DRIVING"
       observance_cause_type:
-        | "TEMPERATURE"
-        | "CLEANLINESS"
-        | "EQUIPMENT_FAILURE"
-        | "DOCUMENTATION"
-        | "OTHER"
+      | "TEMPERATURE"
+      | "CLEANLINESS"
+      | "EQUIPMENT_FAILURE"
+      | "DOCUMENTATION"
+      | "OTHER"
       observance_resolution_type: "FIXED" | "CANCELED" | "REJECTED"
       plan_type: "STARTER" | "PROFESSIONAL"
       reefer_owner_type: "TRAILER" | "VEHICLE"
       reefer_power_supply: "DIESEL" | "ELECTRIC" | "HYBRID"
       stop_types:
-        | "PICKUP"
-        | "MANDATORY_WAYPOINT"
-        | "OPTIONAL_WAYPOINT"
-        | "DROP_OFF"
+      | "PICKUP"
+      | "MANDATORY_WAYPOINT"
+      | "OPTIONAL_WAYPOINT"
+      | "DROP_OFF"
       user_role: "OWNER" | "ADMIN" | "STAFF" | "DRIVER" | "DEV" | "CARRIER"
     }
     CompositeTypes: {
@@ -3613,116 +3724,116 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-    ? R
-    : never
+  ? R
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
+    DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+      Row: infer R
+    }
+  ? R
+  : never
+  : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
+    Insert: infer I
+  }
+  ? I
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Insert: infer I
+  }
+  ? I
+  : never
+  : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
+    Update: infer U
+  }
+  ? U
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Update: infer U
+  }
+  ? U
+  : never
+  : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Enums"]
+  | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+  : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["CompositeTypes"]
+  | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+  : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
 
 export const Constants = {
   graphql_public: {
@@ -3796,6 +3907,7 @@ export const Constants = {
         "EXPIRED",
         "PROGRAMMED",
         "DISPATCHED",
+        "EN_ROUTE_TO_ORIGIN",
         "AT_ORIGIN",
         "LOADING",
         "OBSERVED",
@@ -3867,3 +3979,51 @@ export type DispatchOrderSubstatus = Database['public']['Enums']['dispatch_order
 export type LaneStop = Database['public']['Tables']['lane_stops']['Row']
 export type LaneStopInsert = Database['public']['Tables']['lane_stops']['Insert']
 export type LaneStopUpdate = Database['public']['Tables']['lane_stops']['Update']
+
+export type Organization = Database['public']['Tables']['organizations']['Row']
+export type OrganizationInsert = Database['public']['Tables']['organizations']['Insert']
+export type OrganizationUpdate = Database['public']['Tables']['organizations']['Update']
+
+export type Location = Database['public']['Tables']['locations']['Row']
+export type LocationInsert = Database['public']['Tables']['locations']['Insert']
+export type LocationUpdate = Database['public']['Tables']['locations']['Update']
+
+export type LaneType = Database['public']['Tables']['lane_types']['Row']
+export type LaneTypeInsert = Database['public']['Tables']['lane_types']['Insert']
+export type LaneTypeUpdate = Database['public']['Tables']['lane_types']['Update']
+
+export type OrganizationMember = Database['public']['Tables']['organization_members']['Row']
+export type OrganizationMemberInsert = Database['public']['Tables']['organization_members']['Insert']
+export type OrganizationMemberUpdate = Database['public']['Tables']['organization_members']['Update']
+
+export type FlespiProtocol = Database['public']['Tables']['flespi_protocols']['Row']
+export type FlespiProtocolInsert = Database['public']['Tables']['flespi_protocols']['Insert']
+export type FlespiProtocolUpdate = Database['public']['Tables']['flespi_protocols']['Update']
+
+export type FlespiDeviceType = Database['public']['Tables']['flespi_device_types']['Row']
+export type FlespiDeviceTypeInsert = Database['public']['Tables']['flespi_device_types']['Insert']
+export type FlespiDeviceTypeUpdate = Database['public']['Tables']['flespi_device_types']['Update']
+
+// Hardware & Telematics types
+export type ConnectionDevice = Database['public']['Tables']['connection_device']['Row']
+export type ConnectionDeviceInsert = Database['public']['Tables']['connection_device']['Insert']
+export type ConnectionDeviceUpdate = Database['public']['Tables']['connection_device']['Update']
+
+export type TelematicsProvider = Database['public']['Tables']['telematics_provider']['Row']
+export type TelematicsProviderInsert = Database['public']['Tables']['telematics_provider']['Insert']
+export type TelematicsProviderUpdate = Database['public']['Tables']['telematics_provider']['Update']
+
+export type AssignedType = 'VEHICLE' | 'TRAILER' | 'INVENTORY'
+
+// Vehicle & Trailer types (if not already exported)
+export type Vehicle = Database['public']['Tables']['vehicles']['Row']
+export type VehicleInsert = Database['public']['Tables']['vehicles']['Insert']
+export type VehicleUpdate = Database['public']['Tables']['vehicles']['Update']
+
+export type Trailer = Database['public']['Tables']['trailers']['Row']
+export type TrailerInsert = Database['public']['Tables']['trailers']['Insert']
+export type TrailerUpdate = Database['public']['Tables']['trailers']['Update']
+
+export type Driver = Database['public']['Tables']['drivers']['Row']
+export type DriverInsert = Database['public']['Tables']['drivers']['Insert']
+export type DriverUpdate = Database['public']['Tables']['drivers']['Update']

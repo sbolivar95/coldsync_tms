@@ -39,6 +39,7 @@ export type DispatchBoardFilterKey =
   // SCHEDULED stage
   | 'SCHEDULED_PROGRAMMED'
   | 'SCHEDULED_DISPATCHED'
+  | 'SCHEDULED_EN_ROUTE_TO_ORIGIN'
   | 'SCHEDULED_AT_ORIGIN'
   | 'SCHEDULED_LOADING'
   | 'SCHEDULED_OBSERVED'
@@ -88,6 +89,7 @@ function getStageGroups(orders: DispatchOrderWithRelations[]): StageGroup[] {
   // SCHEDULED stage
   const scheduledProgrammed = orders.filter((order) => order.stage === 'SCHEDULED' && order.substatus === 'PROGRAMMED')
   const scheduledDispatched = orders.filter((order) => order.stage === 'SCHEDULED' && order.substatus === 'DISPATCHED')
+  const scheduledEnRouteToOrigin = orders.filter((order) => order.stage === 'SCHEDULED' && order.substatus === 'EN_ROUTE_TO_ORIGIN')
   const scheduledAtOrigin = orders.filter((order) => order.stage === 'SCHEDULED' && order.substatus === 'AT_ORIGIN')
   const scheduledLoading = orders.filter((order) => order.stage === 'SCHEDULED' && order.substatus === 'LOADING')
   const scheduledObserved = orders.filter((order) => order.stage === 'SCHEDULED' && order.substatus === 'OBSERVED')
@@ -123,11 +125,12 @@ function getStageGroups(orders: DispatchOrderWithRelations[]): StageGroup[] {
     {
       stage: 'SCHEDULED',
       label: 'Programadas',
-      totalCount: scheduledProgrammed.length + scheduledDispatched.length + scheduledAtOrigin.length + scheduledLoading.length + scheduledObserved.length + scheduledCanceled.length,
+      totalCount: scheduledProgrammed.length + scheduledDispatched.length + scheduledEnRouteToOrigin.length + scheduledAtOrigin.length + scheduledLoading.length + scheduledObserved.length + scheduledCanceled.length,
       items: [
-        { key: 'STAGE_SCHEDULED_ALL', label: 'Todas', count: scheduledProgrammed.length + scheduledDispatched.length + scheduledAtOrigin.length + scheduledLoading.length + scheduledObserved.length + scheduledCanceled.length },
+        { key: 'STAGE_SCHEDULED_ALL', label: 'Todas', count: scheduledProgrammed.length + scheduledDispatched.length + scheduledEnRouteToOrigin.length + scheduledAtOrigin.length + scheduledLoading.length + scheduledObserved.length + scheduledCanceled.length },
         { key: 'SCHEDULED_PROGRAMMED', label: 'Programadas', count: scheduledProgrammed.length },
-        { key: 'SCHEDULED_DISPATCHED', label: 'En tránsito a origen', count: scheduledDispatched.length },
+        { key: 'SCHEDULED_DISPATCHED', label: 'Despachadas', count: scheduledDispatched.length },
+        { key: 'SCHEDULED_EN_ROUTE_TO_ORIGIN', label: 'En ruta a origen', count: scheduledEnRouteToOrigin.length },
         { key: 'SCHEDULED_AT_ORIGIN', label: 'En origen', count: scheduledAtOrigin.length },
         { key: 'SCHEDULED_LOADING', label: 'Cargando', count: scheduledLoading.length },
         { key: 'SCHEDULED_OBSERVED', label: 'Observadas', count: scheduledObserved.length, isException: true },
@@ -181,6 +184,8 @@ export function filterOrdersByBoard(
       return orders.filter((order) => order.stage === 'SCHEDULED' && order.substatus === 'PROGRAMMED')
     case 'SCHEDULED_DISPATCHED':
       return orders.filter((order) => order.stage === 'SCHEDULED' && order.substatus === 'DISPATCHED')
+    case 'SCHEDULED_EN_ROUTE_TO_ORIGIN':
+      return orders.filter((order) => order.stage === 'SCHEDULED' && order.substatus === 'EN_ROUTE_TO_ORIGIN')
     case 'SCHEDULED_AT_ORIGIN':
       return orders.filter((order) => order.stage === 'SCHEDULED' && order.substatus === 'AT_ORIGIN')
     case 'SCHEDULED_LOADING':
@@ -232,14 +237,12 @@ export function DispatchBoardsSidebar({
 
   return (
     <div
-      className={`h-full border-r border-gray-300 bg-white z-20 overflow-hidden transition-all duration-200 ${
-        isCollapsed ? 'w-12' : 'w-[20%] min-w-[260px] max-w-[320px]'
-      }`}
+      className={`h-full border-r border-gray-300 bg-white z-20 overflow-hidden transition-all duration-200 ${isCollapsed ? 'w-12' : 'w-[20%] min-w-[260px] max-w-[320px]'
+        }`}
     >
       <div
-        className={`border-b border-[#dde9fb] flex items-center shrink-0 ${
-          isCollapsed ? 'justify-center px-0' : 'justify-between px-4 gap-3'
-        }`}
+        className={`border-b border-[#dde9fb] flex items-center shrink-0 ${isCollapsed ? 'justify-center px-0' : 'justify-between px-4 gap-3'
+          }`}
         style={{ backgroundColor: '#eff5fd', height: `${HEADER_HEIGHT}px`, minHeight: `${HEADER_HEIGHT}px`, maxHeight: `${HEADER_HEIGHT}px` }}
       >
         {!isCollapsed && (
@@ -267,9 +270,8 @@ export function DispatchBoardsSidebar({
             <button
               type='button'
               onClick={() => onBoardChange('ALL')}
-              className={`w-full h-9 rounded-md px-2 text-left flex items-center justify-between transition-colors ${
-                activeBoard === 'ALL' ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`w-full h-9 rounded-md px-2 text-left flex items-center justify-between transition-colors ${activeBoard === 'ALL' ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-50'
+                }`}
             >
               <span className='text-[13px] font-medium'>Todas las órdenes</span>
               <span className='min-w-8 text-right shrink-0 text-xs font-medium'>{orders.length}</span>
@@ -278,7 +280,7 @@ export function DispatchBoardsSidebar({
             {/* Stage groups (Stage > Substatus) */}
             {visibleStageGroups.map((group) => {
               const isExpanded = expandedStages.has(group.stage)
-              
+
               return (
                 <Collapsible
                   key={group.stage}
@@ -311,11 +313,10 @@ export function DispatchBoardsSidebar({
                             key={item.key}
                             type='button'
                             onClick={() => onBoardChange(item.key)}
-                            className={`w-full h-8 rounded-md px-2 text-left flex items-center justify-between transition-colors ${
-                              isActive
+                            className={`w-full h-8 rounded-md px-2 text-left flex items-center justify-between transition-colors ${isActive
                                 ? 'bg-gray-100 text-gray-900'
                                 : 'text-gray-600 hover:bg-gray-50'
-                            }`}
+                              }`}
                           >
                             <span className='text-xs font-normal'>{item.label}</span>
                             <span className='min-w-8 text-right shrink-0 text-[11px] font-mono text-gray-500'>

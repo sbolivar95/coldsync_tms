@@ -14,6 +14,7 @@ export * from './dispatchOrderCosts.service'
 export * from './organizations.service'
 export * from './organizationMembers.service'
 export * from './hardware.service'
+export * from './controlTowerRealtime.service'
 
 // Database utilities
 export * from './seed'

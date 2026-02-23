@@ -12,21 +12,21 @@ interface DispatchSchedulingEditorProps {
 export function DispatchSchedulingEditor({ order, onUpdateOrder }: DispatchSchedulingEditorProps) {
   // Estado para ventana de tiempo
   const [timePreference, setTimePreference] = useState<'no-preference' | 'specific-time' | 'time-window'>('no-preference');
-  
+
   // Estado para edición de fecha
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [tempDate, setTempDate] = useState('');
-  
+
   // Estados para edición de horas
   const [isEditingStartTime, setIsEditingStartTime] = useState(false);
   const [tempStartTime, setTempStartTime] = useState('');
   const [isEditingEndTime, setIsEditingEndTime] = useState(false);
   const [tempEndTime, setTempEndTime] = useState('');
-  
+
   // Estado para edición de ventana de tiempo
   const [isEditingTimePreference, setIsEditingTimePreference] = useState(false);
   const [tempTimePreference, setTempTimePreference] = useState<'no-preference' | 'specific-time' | 'time-window'>('no-preference');
-  
+
   // Estados para prevenir múltiples clics
   const [isSavingDate, setIsSavingDate] = useState(false);
   const [isSavingTimePreference, setIsSavingTimePreference] = useState(false);
@@ -59,6 +59,7 @@ export function DispatchSchedulingEditor({ order, onUpdateOrder }: DispatchSched
       case 'SCHEDULED':
       case 'AT_ORIGIN':
       case 'DISPATCHED':
+      case 'EN_ROUTE_TO_ORIGIN':
         return [];
       default:
         return [];
@@ -91,7 +92,7 @@ export function DispatchSchedulingEditor({ order, onUpdateOrder }: DispatchSched
 
   const handleDateSave = async () => {
     if (isSavingDate) return;
-    
+
     if (tempDate && tempDate !== getDateInputValue(order.planned_start_at)) {
       setIsSavingDate(true);
       try {
@@ -125,7 +126,7 @@ export function DispatchSchedulingEditor({ order, onUpdateOrder }: DispatchSched
 
   const handleTimePreferenceSave = async () => {
     if (isSavingTimePreference) return;
-    
+
     if (!onUpdateOrder) {
       return;
     }
@@ -159,7 +160,7 @@ export function DispatchSchedulingEditor({ order, onUpdateOrder }: DispatchSched
         });
         setTimePreference('time-window');
       }
-      
+
       setIsSavingTimePreference(false);
       setIsEditingTimePreference(false);
     } catch (error) {
@@ -184,7 +185,7 @@ export function DispatchSchedulingEditor({ order, onUpdateOrder }: DispatchSched
 
   const handleStartTimeSave = async () => {
     if (isSavingStartTime) return;
-    
+
     if (tempStartTime && tempStartTime !== order.pickup_window_start) {
       setIsSavingStartTime(true);
       try {
@@ -221,7 +222,7 @@ export function DispatchSchedulingEditor({ order, onUpdateOrder }: DispatchSched
 
   const handleEndTimeSave = async () => {
     if (isSavingEndTime) return;
-    
+
     if (tempEndTime && tempEndTime !== order.pickup_window_end) {
       setIsSavingEndTime(true);
       try {
@@ -307,11 +308,10 @@ export function DispatchSchedulingEditor({ order, onUpdateOrder }: DispatchSched
             ) : (
               <div
                 onClick={handleDateClick}
-                className={`text-xs font-semibold text-gray-900 ${
-                  canEdit('planned_start_at')
+                className={`text-xs font-semibold text-gray-900 ${canEdit('planned_start_at')
                     ? 'cursor-pointer rounded px-2 py-1 -mx-2 -my-1 transition-all hover:bg-gray-50 hover:ring-1 hover:ring-gray-200'
                     : ''
-                }`}
+                  }`}
               >
                 <div className={`flex items-center justify-between ${canEdit('planned_start_at') ? 'group' : ''}`}>
                   <span>{formatDate(order.planned_start_at)}</span>
@@ -364,11 +364,10 @@ export function DispatchSchedulingEditor({ order, onUpdateOrder }: DispatchSched
             ) : (
               <div
                 onClick={handleTimePreferenceClick}
-                className={`text-xs font-semibold text-gray-900 ${
-                  canEdit('time_preference')
+                className={`text-xs font-semibold text-gray-900 ${canEdit('time_preference')
                     ? 'cursor-pointer rounded px-2 py-1 -mx-2 -my-1 transition-all hover:bg-gray-50 hover:ring-1 hover:ring-gray-200'
                     : ''
-                }`}
+                  }`}
               >
                 <div className={`flex items-center justify-between ${canEdit('time_preference') ? 'group' : ''}`}>
                   <span>
@@ -425,13 +424,12 @@ export function DispatchSchedulingEditor({ order, onUpdateOrder }: DispatchSched
               ) : (
                 <div
                   onClick={handleStartTimeClick}
-                  className={`text-xs font-semibold text-gray-900 ${
-                    canEdit('pickup_window_start') && !isEditingTimePreference
+                  className={`text-xs font-semibold text-gray-900 ${canEdit('pickup_window_start') && !isEditingTimePreference
                       ? 'cursor-pointer rounded px-2 py-1 -mx-2 -my-1 transition-all hover:bg-gray-50 hover:ring-1 hover:ring-gray-200'
                       : isEditingTimePreference
-                      ? 'opacity-50'
-                      : ''
-                  }`}
+                        ? 'opacity-50'
+                        : ''
+                    }`}
                 >
                   <div className={`flex items-center justify-between ${canEdit('pickup_window_start') && !isEditingTimePreference ? 'group' : ''}`}>
                     <span>{order.pickup_window_start || '-'}</span>
@@ -486,13 +484,12 @@ export function DispatchSchedulingEditor({ order, onUpdateOrder }: DispatchSched
               ) : (
                 <div
                   onClick={handleStartTimeClick}
-                  className={`text-xs font-semibold text-gray-900 ${
-                    canEdit('pickup_window_start') && !isEditingTimePreference
+                  className={`text-xs font-semibold text-gray-900 ${canEdit('pickup_window_start') && !isEditingTimePreference
                       ? 'cursor-pointer rounded px-2 py-1 -mx-2 -my-1 transition-all hover:bg-gray-50 hover:ring-1 hover:ring-gray-200'
                       : isEditingTimePreference
-                      ? 'opacity-50'
-                      : ''
-                  }`}
+                        ? 'opacity-50'
+                        : ''
+                    }`}
                 >
                   <div className={`flex items-center justify-between ${canEdit('pickup_window_start') && !isEditingTimePreference ? 'group' : ''}`}>
                     <span>{order.pickup_window_start || '-'}</span>
@@ -540,13 +537,12 @@ export function DispatchSchedulingEditor({ order, onUpdateOrder }: DispatchSched
               ) : (
                 <div
                   onClick={handleEndTimeClick}
-                  className={`text-xs font-semibold text-gray-900 ${
-                    canEdit('pickup_window_end') && !isEditingTimePreference
+                  className={`text-xs font-semibold text-gray-900 ${canEdit('pickup_window_end') && !isEditingTimePreference
                       ? 'cursor-pointer rounded px-2 py-1 -mx-2 -my-1 transition-all hover:bg-gray-50 hover:ring-1 hover:ring-gray-200'
                       : isEditingTimePreference
-                      ? 'opacity-50'
-                      : ''
-                  }`}
+                        ? 'opacity-50'
+                        : ''
+                    }`}
                 >
                   <div className={`flex items-center justify-between ${canEdit('pickup_window_end') && !isEditingTimePreference ? 'group' : ''}`}>
                     <span>{order.pickup_window_end || '-'}</span>

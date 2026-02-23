@@ -33,6 +33,8 @@ export const connectionDeviceSchema = z.object({
     .string()
     .optional()
     .nullable(),
+  has_can: z.boolean().default(false),
+  temp_mode: z.enum(['NONE', 'SINGLE', 'MULTI'] as const).default('NONE'),
   notes: z
     .string()
     .optional()

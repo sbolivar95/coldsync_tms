@@ -1,31 +1,20 @@
-import { Circle, AlertTriangle } from "lucide-react";
-import { TrackingUnit } from "../utils/mock-data";
+import { TriangleAlert } from "lucide-react";
+import { TrackingUnit } from "../types";
+import { formatSignalAgeCompact, resolveSignalAgeSeconds } from "../utils/signal-age";
+import { MobilityIndicator } from "./MobilityIndicator";
 
 interface UnitCardProps {
   unit: TrackingUnit;
   isSelected: boolean;
   onClick: () => void;
+  nowMs: number;
 }
 
-export function UnitCard({ unit, isSelected, onClick }: UnitCardProps) {
-  const getStatusDotColor = (status: string, hasActiveTrip: boolean) => {
-    // Si no tiene viaje activo, mostrar círculo outline gris
-    if (!hasActiveTrip) {
-      return "fill-none stroke-gray-400 stroke-[1.5]";
-    }
-
-    // Si tiene viaje activo, mostrar color según estado
-    switch (status) {
-      case "En Ruta":
-        return "fill-tracking-driving text-tracking-driving";
-      case "Detenido":
-        return "fill-tracking-stopped text-tracking-stopped";
-      case "En Planta":
-        return "fill-tracking-idle text-tracking-idle";
-      default:
-        return "fill-tracking-offline text-tracking-offline";
-    }
-  };
+export function UnitCard({ unit, isSelected, onClick, nowMs }: UnitCardProps) {
+  const liveAgeSec = resolveSignalAgeSeconds(unit, nowMs);
+  const connectionAgeLabel = unit.hasKnownMessage
+    ? formatSignalAgeCompact(liveAgeSec)
+    : "Nunca";
 
   const getErrorSeverityColor = (severity: string) => {
     switch (severity) {
@@ -46,69 +35,94 @@ export function UnitCard({ unit, isSelected, onClick }: UnitCardProps) {
       className={`w-full h-32 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors text-left flex flex-col justify-between ${isSelected ? "bg-primary-light" : ""
         }`}
     >
-      {/* Línea 1: ID Vehículo/Remolque + Velocidad/Tiempo + Estado */}
+      {/* Line 1: Vehicle/Trailer ID + Speed/Time + Status */}
       <div className="flex items-start justify-between mb-1.5">
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-1.5">
-            <Circle
-              className={`w-2 h-2 shrink-0 ${getStatusDotColor(unit.status, unit.hasActiveTrip)}`}
-            />
-            <span className="font-semibold text-sm text-gray-900">
+            <MobilityIndicator unit={unit} arrowSize={13} shapeSize={10} />
+            <span className="text-sm font-semibold text-gray-900 leading-none">
               {unit.unit}
             </span>
-            <span className="text-xs text-gray-400 flex items-center gap-1">
-              {unit.trailer}
-              {/* ✅ Badge HYB para remolques híbridos - inline después del ID */}
-              {unit.trailerEsHibrido && (
-                <span className="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-hibrido-bg text-hibrido-text">
-                  HYB
-                </span>
-              )}
-            </span>
+            {unit.isHybridTrailer && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-primary">
+                HYB
+              </span>
+            )}
           </div>
-          {/* Línea 2: Conductor */}
-          <div className="text-xs text-gray-900">{unit.driver}</div>
+          {/* Line 2: Trailer + Driver (or just Driver for rigid/van) */}
+          <div className="text-xs text-gray-500 truncate">
+            {unit.trailer
+              ? [unit.trailer, unit.driver].filter(Boolean).join(" · ")
+              : unit.driver}
+          </div>
         </div>
         <div className="flex flex-col items-end shrink-0">
           <span className="text-sm font-semibold text-gray-900">
             {unit.speed}
           </span>
-          <span className="text-[11px] text-gray-400">{unit.lastUpdate}</span>
+          <span className="text-[11px] text-gray-400">{connectionAgeLabel}</span>
         </div>
       </div>
 
-      {/* Línea 3: Ubicación */}
+      {/* Line 3: Location */}
       <div className="text-xs text-gray-500 mb-1.5 truncate">
         {unit.location}
       </div>
 
-      {/* Línea 4: Datos del Reefer CAN - siempre mostrar para mantener altura consistente */}
+      {/* Line 4: Reefer CAN data - always show to maintain consistent height */}
       <div className="text-xs text-gray-500 pt-1.5 border-t border-gray-100 flex items-center justify-between gap-2">
-        {unit.reeferMode && unit.reeferSetpoint ? (
-          <>
-            <div className="truncate flex-1 min-w-0 text-[12px]">
+        <div className="truncate flex-1 min-w-0 text-[12px]">
+          {unit.hasCan && (
+            <>
               <span className="text-gray-400 text-[12px]">Modo:</span>{" "}
               {unit.reeferMode}
               <span className="text-gray-300 mx-1.5">·</span>
               <span className="text-gray-400 text-[12px]">Setpoint:</span>{" "}
               {unit.reeferSetpoint}
               <span className="text-gray-300 mx-1.5">·</span>
-              <span className="text-gray-400 text-[12px]">Temp:</span>{" "}
-              {unit.temperature}
-            </div>
-            {unit.reeferError && (
-              <div
-                className={`flex items-center gap-1 ${getErrorSeverityColor(unit.reeferError.severity)} font-semibold shrink-0`}
-              >
-                <AlertTriangle className="w-3 h-3" />
-                <span>{unit.reeferError.code}</span>
-              </div>
-            )}
-          </>
-        ) : (
-          <span className="text-gray-400 italic">
-            Sin datos CAN disponibles
-          </span>
+            </>
+          )}
+          <span className="text-gray-400 text-xs">
+            {unit.tempMode === "MULTI" ? "Temp 1|2:" : "Temp:"}
+          </span>{" "}
+          {unit.tempMode === "MULTI" ? (
+            <span className="inline-flex items-center gap-1 text-gray-600 font-semibold text-[11px]">
+              <span className="inline-flex items-center gap-0.5">
+                <span>{unit.temperatureChannel1 ?? "--"}</span>
+                {unit.hasTemperatureChannel1Error && (
+                  <span title="Error en sensor de temperatura 1">
+                    <TriangleAlert className="w-3 h-3 text-orange-500 align-middle" />
+                  </span>
+                )}
+              </span>
+              <span className="text-gray-300 mx-0.5">|</span>
+              <span className="inline-flex items-center gap-0.5">
+                <span>{unit.temperatureChannel2 ?? "--"}</span>
+                {unit.hasTemperatureChannel2Error && (
+                  <span title="Error en sensor de temperatura 2">
+                    <TriangleAlert className="w-3 h-3 text-orange-500 align-middle" />
+                  </span>
+                )}
+              </span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-0.5 text-gray-600 font-semibold text-[11px]">
+              <span>{unit.temperature}</span>
+              {unit.hasTemperatureError && (
+                <span title="Error de sensor de temperatura">
+                  <TriangleAlert className="w-3 h-3 text-orange-500 align-middle" />
+                </span>
+              )}
+            </span>
+          )}
+        </div>
+        {unit.reeferError && (
+          <div
+            className={`flex items-center gap-1 ${getErrorSeverityColor(unit.reeferError.severity)} font-semibold shrink-0`}
+          >
+            <TriangleAlert className="w-3 h-3" />
+            <span>{unit.reeferError.code}</span>
+          </div>
         )}
       </div>
     </button>

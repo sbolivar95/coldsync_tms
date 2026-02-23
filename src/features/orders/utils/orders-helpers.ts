@@ -1,12 +1,12 @@
 
-import { Order, OrderStatus, getThermalProfileNameById, mapStatusToEnglish } from "../../../lib/mockData";
-import { Package, CheckCircle2, Clock, MapPin, ClipboardCheck, XCircle, AlertCircle, Send, Ban } from "lucide-react";
+import { Order, getThermalProfileNameById } from "../../../lib/mockData";
+import { Package, CheckCircle2, Clock, MapPin, XCircle, AlertCircle, Send, Ban, Calendar } from "lucide-react";
 import React from 'react';
 import { CarrierOrder } from "../../../services/database/orders.service";
 
 
 
-// Helper para calcular TTL restante según orders.md
+// Helper to calculate remaining TTL according to orders.md
 export const getTTLRemaining = (tenderCreatedAt: string, pickupDate: string, pickupTime: string, responseDeadline?: string): string => {
     const now = new Date(); 
     
@@ -18,7 +18,7 @@ export const getTTLRemaining = (tenderCreatedAt: string, pickupDate: string, pic
         const tenderCreated = new Date(tenderCreatedAt);
         const pickup = new Date(`${pickupDate}T${pickupTime}`);
 
-        // Calcular TTL según política de orders.md (Fallback Logic)
+        // Calculate TTL according to orders.md policy (Fallback Logic)
         const pickupDiffMs = pickup.getTime() - tenderCreated.getTime();
         const pickupDiffDays = pickupDiffMs / (1000 * 60 * 60 * 24); // Use float for accuracy? No, logic was originally integer days.
         // Replicating new logic roughly or keeping old fallback:
@@ -60,7 +60,7 @@ export const getTTLRemaining = (tenderCreatedAt: string, pickupDate: string, pic
     }
 };
 
-// Helper para tiempo desde decisión (para estados finalizados)
+// Helper to get time since decision (for completed states)
 export const getTimeSinceDecision = (decisionTimestamp: string): string => {
     const now = new Date();
     const decision = new Date(decisionTimestamp);
@@ -79,7 +79,7 @@ export const getTimeSinceDecision = (decisionTimestamp: string): string => {
     }
 };
 
-// Helper para formatear fecha y hora
+// Helper to format date and time
 export const formatDateAndTime = (dateStr?: string, timeStr?: string): string => {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
@@ -101,8 +101,7 @@ export const formatDateAndTime = (dateStr?: string, timeStr?: string): string =>
     return `${dayCapitalized}, ${day} ${month} ${time}`;
 };
 
-// Helper para detectar si una orden es híbrida
-// Helper para detectar si una orden es híbrida
+// Helper to detect if an order is hybrid
 export const isOrderHybrid = (order: Order | CarrierOrder): boolean => {
     // Check if it's CarrierOrder with items
     if ('items' in order && order.items && order.items.length > 0) {
@@ -129,7 +128,7 @@ export const isOrderHybrid = (order: Order | CarrierOrder): boolean => {
     );
 };
 
-// Helper para obtener el color del círculo de estado
+// Helper to get status circle color
 export const getStatusDotColor = (status?: string, hasActiveTrip?: boolean): string => {
     if (!hasActiveTrip) {
         return "fill-none stroke-gray-400 stroke-[1.5]";
@@ -147,26 +146,9 @@ export const getStatusDotColor = (status?: string, hasActiveTrip?: boolean): str
     }
 };
 
-// Configuración de estados según orders.md
-export const getStatusConfig = (status?: OrderStatus | string) => {
-    let englishStatus: OrderStatus = "unassigned";
-
-    if (status) {
-        if (typeof status === 'string') {
-            const validEnglishStatuses: OrderStatus[] = [
-                "unassigned", "assigned", "pending", "scheduled", "rejected",
-                "observed", "dispatched", "cancelled", "at-origin", "at-destination"
-            ];
-
-            if (validEnglishStatuses.includes(status.toLowerCase() as OrderStatus)) {
-                englishStatus = status.toLowerCase() as OrderStatus;
-            } else {
-                englishStatus = mapStatusToEnglish(status.toLowerCase());
-            }
-        } else {
-            englishStatus = status;
-        }
-    }
+// Substatus configuration according to orders.md
+export const getStatusConfig = (substatus?: string) => {
+    const normalizedSubstatus = substatus?.toUpperCase() || "PENDING";
 
     const statusConfig: Record<string, {
         label: string;
@@ -175,79 +157,82 @@ export const getStatusConfig = (status?: OrderStatus | string) => {
         iconColor: string;
         urgencyLevel?: 'normal' | 'high' | 'critical';
     }> = {
-        "unassigned": {
-            label: "Sin Asignar",
-            badgeClassName: "bg-gray-100 text-gray-600",
-            icon: Package,
-            iconColor: "#6b7280",
-        },
-        "assigned": {
-            label: "Asignada",
-            badgeClassName: "bg-gray-100 text-gray-600",
-            icon: CheckCircle2,
-            iconColor: "#6b7280",
-        },
-        "pending": {
+        // TENDERS substatus
+        "PENDING": {
             label: "Pendiente",
             badgeClassName: "bg-blue-50 text-blue-700",
             icon: Clock,
             iconColor: "#3b82f6",
             urgencyLevel: 'normal',
         },
-        "scheduled": {
-            label: "Programada",
-            badgeClassName: "bg-blue-50 text-blue-700",
+        "ACCEPTED": {
+            label: "Aceptada",
+            badgeClassName: "bg-green-50 text-green-700",
             icon: CheckCircle2,
-            iconColor: "#3b82f6",
+            iconColor: "#10b981",
         },
-        "at-origin": {
-            label: "En Origen",
-            badgeClassName: "bg-blue-50 text-blue-700",
-            icon: MapPin,
-            iconColor: "#3b82f6",
-        },
-        "at-destination": {
-            label: "En Destino",
-            badgeClassName: "bg-gray-100 text-gray-700",
-            icon: ClipboardCheck,
-            iconColor: "#6b7280",
-        },
-        "rejected": {
+        "REJECTED": {
             label: "Rechazada",
             badgeClassName: "bg-gray-100 text-gray-600",
             icon: XCircle,
             iconColor: "#6b7280",
         },
-        "observed": {
-            label: "Observada",
-            badgeClassName: "bg-amber-50 text-amber-700",
-            icon: AlertCircle,
-            iconColor: "#f59e0b",
-        },
-        "dispatched": {
-            label: "Despachada",
-            badgeClassName: "bg-green-50 text-green-700",
-            icon: Send,
-            iconColor: "#10b981",
-        },
-        "cancelled": {
-            label: "Cancelada",
-            badgeClassName: "bg-gray-100 text-gray-600",
-            icon: Ban,
-            iconColor: "#6b7280",
-        },
-        "expired": {
+        "EXPIRED": {
             label: "Expirada",
             badgeClassName: "bg-gray-100 text-gray-600",
             icon: Clock,
             iconColor: "#6b7280",
         },
+        // SCHEDULED substatus
+        "PROGRAMMED": {
+            label: "Programada",
+            badgeClassName: "bg-blue-50 text-blue-700",
+            icon: Calendar,
+            iconColor: "#3b82f6",
+        },
+        "DISPATCHED": {
+            label: "Despachada",
+            badgeClassName: "bg-green-50 text-green-700",
+            icon: Send,
+            iconColor: "#10b981",
+        },
+        "EN_ROUTE_TO_ORIGIN": {
+            label: "En Ruta a Origen",
+            badgeClassName: "bg-blue-50 text-blue-700",
+            icon: MapPin,
+            iconColor: "#3b82f6",
+        },
+        "AT_ORIGIN": {
+            label: "En Origen",
+            badgeClassName: "bg-blue-50 text-blue-700",
+            icon: MapPin,
+            iconColor: "#3b82f6",
+        },
+        "LOADING": {
+            label: "Cargando",
+            badgeClassName: "bg-blue-50 text-blue-700",
+            icon: Package,
+            iconColor: "#3b82f6",
+        },
+        "OBSERVED": {
+            label: "Observada",
+            badgeClassName: "bg-amber-50 text-amber-700",
+            icon: AlertCircle,
+            iconColor: "#f59e0b",
+        },
+        // Cross-cutting
+        "CANCELED": {
+            label: "Cancelada",
+            badgeClassName: "bg-gray-100 text-gray-600",
+            icon: Ban,
+            iconColor: "#6b7280",
+        },
     };
 
-    return statusConfig[englishStatus] || statusConfig["unassigned"];
+    return statusConfig[normalizedSubstatus] || statusConfig["PENDING"];
 };
 
-// Helper para determinar urgencia de TTL
+// Helper to determine TTL urgency
 export const getTTLUrgency = (ttlRemaining: string): 'normal' | 'high' | 'critical' => {
     if (ttlRemaining === "Expirado") return 'critical';
 
@@ -267,7 +252,7 @@ export const getTTLUrgency = (ttlRemaining: string): 'normal' | 'high' | 'critic
     return 'normal';
 };
 
-// Helper para obtener información completa del estado
+// Helper to get complete status information
 export const getOrderStatusDisplay = (
     order: Order | CarrierOrder,
     tenderCreatedAt?: string,
@@ -278,17 +263,14 @@ export const getOrderStatusDisplay = (
     urgency: 'normal' | 'high' | 'critical';
     dotColor: string;
 } => {
-    // @ts-ignore
-    const rawStatus = order.status || order.estado || "pending";
-    const status = rawStatus.toLowerCase();
+    // Read substatus from CarrierOrder
+    const substatus = ('substatus' in order ? order.substatus : null) || "PENDING";
+    const normalizedSubstatus = substatus.toUpperCase();
     
-    // Debug log
-    console.log('getOrderStatusDisplay - rawStatus:', rawStatus, 'status:', status, 'tenderCreatedAt:', tenderCreatedAt);
-    
-    const statusConfig = getStatusConfig(status);
+    const statusConfig = getStatusConfig(normalizedSubstatus);
 
-    // Estados que requieren TTL (tender pendiente)
-    if (status === "pending" || status === "solicitado" || status === "solicitud") {
+    // States that require TTL (pending tender)
+    if (normalizedSubstatus === "PENDING") {
         let expectedDate: string | undefined;
         let expectedTime: string | undefined;
 
@@ -303,15 +285,11 @@ export const getOrderStatusDisplay = (
             expectedTime = order.expectedTime;
         }
 
-        console.log('Pending status - expectedDate:', expectedDate, 'expectedTime:', expectedTime, 'tenderCreatedAt:', tenderCreatedAt);
-
         if (tenderCreatedAt && expectedDate && expectedTime) {
             // @ts-ignore
             const responseDeadline = order.response_deadline;
             const ttlRemaining = getTTLRemaining(tenderCreatedAt, expectedDate, expectedTime, responseDeadline);
             const urgency = getTTLUrgency(ttlRemaining);
-
-            console.log('TTL calculation - ttlRemaining:', ttlRemaining, 'urgency:', urgency);
 
             return {
                 label: statusConfig.label,
@@ -322,8 +300,8 @@ export const getOrderStatusDisplay = (
         }
     }
 
-    // Estados finalizados con timestamp de decisión
-    if ((status === "rejected" || status === "rechazada") && decisionTimestamp) {
+    // Completed states with decision timestamp
+    if ((normalizedSubstatus === "REJECTED" || normalizedSubstatus === "EXPIRED") && decisionTimestamp) {
         return {
             label: statusConfig.label,
             timeInfo: getTimeSinceDecision(decisionTimestamp),
@@ -332,55 +310,16 @@ export const getOrderStatusDisplay = (
         };
     }
 
-    if (status === "expired" || status === "expirada") {
+    if (normalizedSubstatus === "OBSERVED" && decisionTimestamp) {
         return {
-            label: "Expirada",
-            timeInfo: decisionTimestamp ? getTimeSinceDecision(decisionTimestamp) : "",
-            urgency: 'normal',
-            dotColor: '#6b7280'
-        };
-    }
-
-    // Nuevos estados según orders.md
-    if (status === "accepted" || status === "aceptada") {
-        return {
-            label: "Aceptada",
-            timeInfo: "",
-            urgency: 'normal',
-            dotColor: '#10b981'
-        };
-    }
-
-    if (status === "observed" || status === "observada") {
-        return {
-            label: "Observada",
-            timeInfo: decisionTimestamp ? getTimeSinceDecision(decisionTimestamp) : "",
+            label: statusConfig.label,
+            timeInfo: getTimeSinceDecision(decisionTimestamp),
             urgency: 'normal',
             dotColor: '#f59e0b'
         };
     }
 
-    if (status === "fail_after_accept") {
-        return {
-            label: "Falla Post-Aceptación",
-            timeInfo: decisionTimestamp ? getTimeSinceDecision(decisionTimestamp) : "",
-            urgency: 'normal',
-            dotColor: '#ef4444'
-        };
-    }
-
-    if (status === "closed_by_handoff") {
-        return {
-            label: "Cerrada por Handoff",
-            timeInfo: "",
-            urgency: 'normal',
-            dotColor: '#6b7280'
-        };
-    }
-
-    console.log('Fallback - using statusConfig.iconColor:', statusConfig.iconColor);
-
-    // Estados sin información temporal
+    // States without temporal information
     return {
         label: statusConfig.label,
         timeInfo: "",
@@ -389,7 +328,7 @@ export const getOrderStatusDisplay = (
     };
 };
 
-// Helper para obtener tipo de equipo requerido (perfil térmico)
+// Helper to get required equipment type (thermal profile)
 export const getEquipmentType = (order: Order | CarrierOrder): string => {
     const isHybrid = isOrderHybrid(order);
 
@@ -444,11 +383,11 @@ export const getEquipmentType = (order: Order | CarrierOrder): string => {
 };
 
 
-// Helper para calcular la fecha límite de respuesta (Planned Start - 24h)
+// Helper to calculate response deadline (Planned Start - 24h)
 export const getDeadline = (plannedStart: string): Date => {
-    // Si no hay planned_start, usar ahora (o manejar como caso de error/default)
+    // If no planned_start, use now (or handle as error/default case)
     const startDate = plannedStart ? new Date(plannedStart) : new Date();
-    // Restar 24 horas
+    // Subtract 24 hours
     return new Date(startDate.getTime() - 24 * 60 * 60 * 1000);
 };
 

@@ -39,7 +39,14 @@ Es válido crear una asignación activa sin conductor.
 *   **Semántica:** El vehículo está disponible operativa/técnicamente, o siendo movido en patio (Spotting), pero no tiene un viaje asignado a un conductor específico.
 *   **Implementación:** Columna `driver_id` es `NULLABLE`.
 
-### 2.3 Drop & Hook y "Robo" de Recursos
+### 2.3 Compatibilidad Vehículo-Remolque (Regla Explícita)
+La asignación de remolque depende estrictamente del tipo de vehículo.
+
+*   **Regla principal:** Solo un vehículo `TRACTOR` puede tener `trailer_id`.
+*   **Regla derivada:** Si `vehicle_type != TRACTOR` (`RIGID` o `VAN`, etc), entonces `trailer_id` debe ser `NULL`.
+*   **Semántica operativa:** `RIGID` y `VAN` y cualquier otro tipo de vehículo operan siempre sin remolque.
+
+### 2.4 Drop & Hook y "Robo" de Recursos
 El sistema implementa lógica automática de resolución de conflictos conocida como "Steal Logic".
 
 *   **Escenario A (Reasignación Simple):** Si asigno al Conductor A (que estaba en V1) al Vehículo V2:
@@ -50,11 +57,14 @@ El sistema implementa lógica automática de resolución de conflictos conocida 
     2.  V2 engancha R1.
 *   **Confirmación:** Estas operaciones requieren confirmación explícita del usuario en la UI (`AssignmentConflictDialog`), informando las consecuencias.
 
-### 2.4 Estados Derivados
+### 2.5 Estados Derivados
 *   **Spotting:** Vehículo Activo sin Conductor (En UI: "Sin Conductor").
 *   **Bobtail:** Vehículo TRACTOR Activo con Conductor pero sin Remolque.
     *   *Nota:* Aunque "Bobtail" es el término estándar de industria (proveniente del perro sin cola), en la **Interfaz de Usuario (UI)** se debe utilizar **"Sin Remolque"** para facilitar la comprensión del usuario hispanohablante.
 *   **Full:** Vehículo TRACTOR Activo con Conductor y Remolque.
+
+### 2.6 Glosario Operativo
+*   **Bobtail (operación) = "Sin Remolque" (UI):** ambos términos representan exactamente el estado `TRACTOR` con `trailer_id = NULL`.
 
 ---
 
@@ -67,6 +77,7 @@ El sistema implementa lógica automática de resolución de conflictos conocida 
 | Remolque | Libre | Asignar a V1 | ✅ Permitido directo. |
 | Remolque | En V2 | Asignar a V1 | ⚠️ Confirmar: "Remolque será movido de V2 a V1. V2 quedará en Bobtail". |
 | Vehículo | Spotting | Asignar Cond. | ✅ Actualiza el set existente. |
+| Vehículo `RIGID`/`VAN` | Sin remolque | Asignar Remolque | ❌ No permitido por regla de compatibilidad de tipo. |
 
 ---
 

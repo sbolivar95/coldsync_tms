@@ -6,14 +6,14 @@ import { cn } from "../../../lib/utils";
 /**
  * UNITS LIST COMPONENT - ColdSync
  * 
- * Componente reutilizable para mostrar una lista de unidades agrupadas por compañía de logística.
+ * Reusable component to display a list of units grouped by logistics company (carrier).
  * 
- * Características:
- * - Agrupación por compañía de logística
- * - Indicadores de estado (círculo verde/rojo/hueco)
- * - Badge HYB para unidades híbridas
- * - Iconos de advertencia para problemas
- * - Selección de unidades
+ * Features:
+ * - Grouping by logistics company
+ * - Status indicators (green/red/hollow dot)
+ * - HYB badge for hybrid units
+ * - Warning icons for issues
+ * - Unit selection
  * 
  * @example
  * ```tsx
@@ -29,33 +29,33 @@ import { cn } from "../../../lib/utils";
 export type UnitStatus = "active" | "inactive" | "warning" | "hollow" | "selected";
 
 export interface Unit extends UnitCardUnit {
-  carrier: string; // Nombre de la compañía
-  // Mapeo de campos para compatibilidad
-  trackingId?: string; // TRK-XXXX (alias de unit)
-  code?: string; // RMQ-XXX (alias de trailer)
-  isHybrid?: boolean; // Alias de trailerEsHibrido
-  hasWarning?: boolean; // Alias de hasIssue
+  carrier: string; // Carrier company name
+  // Field mapping for compatibility
+  trackingId?: string; // TRK-XXXX (alias for unit)
+  code?: string; // RMQ-XXX (alias for trailer)
+  isHybrid?: boolean; // Alias for isHybridTrailer
+  hasWarning?: boolean; // Alias for hasIssue
 }
 
 export interface UnitsListProps {
-  /** Lista de unidades a mostrar */
+  /** List of units to display */
   units: Unit[];
-  /** ID de la unidad seleccionada */
+  /** ID of the selected unit */
   selectedUnitId?: string;
-  /** Callback cuando se selecciona una unidad */
+  /** Callback when a unit is selected */
   onSelectUnit?: (unitId: string) => void;
-  /** Callback cuando se hace click en el filtro */
+  /** Callback when filter button is clicked */
   onFilterClick?: () => void;
-  /** Función para obtener el color del indicador de estado (igual que VehicleDropZone) */
+  /** Function to get status dot color (replicates VehicleDropZone behavior) */
   getStatusDotColor: (status: string, hasActiveTrip: boolean) => string;
-  /** Clases CSS adicionales */
+  /** Additional CSS classes */
   className?: string;
 }
 
 /**
- * Componente UnitsList
+ * UnitsList Component
  * 
- * Renderiza una lista de unidades agrupadas por compañía de logística.
+ * Renders a list of units grouped by logistics company.
  */
 export function UnitsList({
   units,
@@ -65,7 +65,7 @@ export function UnitsList({
   getStatusDotColor,
   className,
 }: UnitsListProps) {
-  // Agrupar unidades por compañía
+  // Group units by carrier
   const groupedByCarrier = units.reduce((acc, unit) => {
     if (!acc[unit.carrier]) {
       acc[unit.carrier] = [];
@@ -74,10 +74,10 @@ export function UnitsList({
     return acc;
   }, {} as Record<string, Unit[]>);
 
-  // Calcular total de unidades
+  // Calculate total unit count
   const totalUnits = units.length;
 
-  // Convertir Unit a UnitCardUnit (mapear campos)
+  // Convert Unit to UnitCardUnit (field mapping)
   const toUnitCardUnit = (unit: Unit): UnitCardUnit => ({
     id: unit.id,
     unit: unit.trackingId || unit.unit,
@@ -85,7 +85,7 @@ export function UnitsList({
     driver: unit.driver,
     status: unit.status,
     hasActiveTrip: unit.hasActiveTrip,
-    trailerEsHibrido: unit.isHybrid || unit.trailerEsHibrido,
+    isHybridTrailer: unit.isHybrid || unit.isHybridTrailer,
     hasIssue: unit.hasWarning || unit.hasIssue,
   });
 
@@ -95,7 +95,7 @@ export function UnitsList({
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-gray-900">
-            Unidades {totalUnits}
+            Units {totalUnits}
           </h3>
         </div>
         {onFilterClick && (
@@ -110,7 +110,7 @@ export function UnitsList({
         )}
       </div>
 
-      {/* Lista de unidades agrupadas */}
+      {/* Grouped units list */}
       <div className="flex-1 overflow-y-auto">
         {Object.entries(groupedByCarrier).map(([carrier, carrierUnits]) => {
           const activeCount = carrierUnits.filter(
@@ -120,14 +120,14 @@ export function UnitsList({
 
           return (
             <div key={carrier} className="border-b border-gray-100 last:border-b-0">
-              {/* Header de compañía */}
+              {/* Carrier Header */}
               <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
                 <h4 className="text-xs font-bold text-gray-900">
                   {carrier} {activeCount}/{totalCount}
                 </h4>
               </div>
 
-              {/* Unidades de la compañía - Usando UnitCard (réplica exacta) */}
+              {/* Carrier units - Using UnitCard (exact replica) */}
               <div className="divide-y divide-gray-100">
                 {carrierUnits.map((unit) => {
                   const isSelected = selectedUnitId === unit.id;
@@ -155,3 +155,4 @@ export function UnitsList({
     </div>
   );
 }
+

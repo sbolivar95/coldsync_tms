@@ -4,37 +4,37 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover
 import { Calendar as CalendarComponent } from '@/components/ui/Calendar'
 import { cn } from '@/lib/utils'
 import React from 'react'
-
-// Modos de densidad visual (solo para Gantt)
-export type ViewDensityMode = 'compact' | 'normal' | 'detailed'
-
-// Modos de visualización
-export type DisplayMode = 'list' | 'gantt'
+import type { DisplayMode, ViewDensityMode, ListHorizonPreset } from './DispatchViewControlTypes'
 
 interface DispatchViewControlsProps {
+  // Gantt-specific props (optional)
   densityMode?: ViewDensityMode
   onDensityModeChange?: (mode: ViewDensityMode) => void
-  displayMode?: DisplayMode
+  // List-specific props (optional)
+  listHorizonPreset?: ListHorizonPreset
+  onListHorizonPresetChange?: (preset: ListHorizonPreset) => void
+  // Common props
+  displayMode: DisplayMode
   onDisplayModeChange?: (mode: DisplayMode) => void
   calendarRangeLabel: string
   onPreviousClick: () => void
   onNextClick: () => void
   onDateSelect: (date: Date | undefined) => void
   selectedDate: Date
-  showDensityControls?: boolean // Solo mostrar en vista Gantt
 }
 
 export function DispatchViewControls({
-  densityMode = 'normal',
+  densityMode,
   onDensityModeChange,
-  displayMode = 'gantt',
+  listHorizonPreset,
+  onListHorizonPresetChange,
+  displayMode,
   onDisplayModeChange,
   calendarRangeLabel,
   onPreviousClick,
   onNextClick,
   onDateSelect,
   selectedDate,
-  showDensityControls = false,
 }: DispatchViewControlsProps) {
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false)
 
@@ -47,19 +47,63 @@ export function DispatchViewControls({
 
   return (
     <div className='flex items-center gap-2'>
-      {/* Grupo: Navegación + Date Picker */}
+      {/* Horizon selector (List view only) */}
+      {displayMode === 'list' && listHorizonPreset && onListHorizonPresetChange && (
+        <div className='flex items-center gap-0.5 bg-gray-100 rounded-md p-1'>
+          <Button
+            variant='ghost'
+            size='sm'
+            className={cn(
+              'h-7 px-3 rounded transition-all',
+              listHorizonPreset === 'OPERATIONS'
+                ? 'bg-white text-primary shadow-sm hover:bg-white font-semibold'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-transparent'
+            )}
+            onClick={() => onListHorizonPresetChange('OPERATIONS')}
+          >
+            Ventana
+          </Button>
+          <Button
+            variant='ghost'
+            size='sm'
+            className={cn(
+              'h-7 px-3 rounded transition-all',
+              listHorizonPreset === 'TODAY'
+                ? 'bg-white text-primary shadow-sm hover:bg-white font-semibold'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-transparent'
+            )}
+            onClick={() => onListHorizonPresetChange('TODAY')}
+          >
+            Hoy
+          </Button>
+          <Button
+            variant='ghost'
+            size='sm'
+            className={cn(
+              'h-7 px-3 rounded transition-all',
+              listHorizonPreset === 'THREE_DAYS'
+                ? 'bg-white text-primary shadow-sm hover:bg-white font-semibold'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-transparent'
+            )}
+            onClick={() => onListHorizonPresetChange('THREE_DAYS')}
+          >
+            3 dias
+          </Button>
+        </div>
+      )}
+
+      {/* Calendar navigation (always shown) */}
       <div className='flex items-center gap-1'>
         <Button
           variant='outline'
           size='sm'
           className='h-8 w-8 p-0'
           onClick={onPreviousClick}
-          title='Período anterior'
+          title='Periodo anterior'
         >
           <ChevronLeft className='h-4 w-4' />
         </Button>
 
-        {/* Date Picker con rango */}
         <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -87,14 +131,14 @@ export function DispatchViewControls({
           size='sm'
           className='h-8 w-8 p-0'
           onClick={onNextClick}
-          title='Período siguiente'
+          title='Periodo siguiente'
         >
           <ChevronRight className='h-4 w-4' />
         </Button>
       </div>
 
-      {/* Selector de densidad visual (solo en Gantt) */}
-      {showDensityControls && onDensityModeChange && (
+      {/* Density selector (Gantt view only) */}
+      {displayMode === 'gantt' && densityMode && onDensityModeChange && (
         <div className='flex items-center gap-0.5 bg-gray-100 rounded-md p-1'>
           <Button
             variant='ghost'
@@ -140,7 +184,7 @@ export function DispatchViewControls({
         </div>
       )}
 
-      {/* Selector de tipo de visualización (Lista/Gantt) */}
+      {/* View mode toggle (always shown if handler provided) */}
       {onDisplayModeChange && (
         <div className='flex items-center gap-0.5 bg-gray-100 rounded-md p-1'>
           <Button

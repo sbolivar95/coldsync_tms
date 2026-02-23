@@ -26,7 +26,7 @@ Este módulo fusiona la telemetría IoT (vía Flespi) con los datos del contrato
 
 La Torre de Control está organizada en:
 
-- **Header con Tabs de Filtrado:** 8 tabs para filtrar unidades según estado operativo
+- **Header con Tabs de Filtrado:** 5 tabs para filtrar universo de tracking y estado de ejecución
 - **Barra de Búsqueda Global:** Búsqueda por Unidad, Remolque, Conductor, Ubicación o Transportista
 - **Filtros Adicionales:** Estado, Transportista, Tipo de Vehículo
 - **Layout Principal:**
@@ -36,20 +36,17 @@ La Torre de Control está organizada en:
 
 ## Sistema de Tabs de Filtrado
 
-Los tabs permiten filtrar los viajes activos según su estado operativo:
+Los tabs implementados actualmente son:
 
-| Tab                   | Descripción                                        | Contenido                              |
-| :-------------------- | :------------------------------------------------- | :------------------------------------- |
-| **Todos**             | Todas las unidades visibles (con y sin viaje)      | Tracking general de flota + Viajes     |
-| **Programado**        | Ticket enviado, aún no salió de su base            | Solo unidades con viaje programado     |
-| **En Origen**         | Dentro de geocerca de carga (cargando o esperando) | Solo unidades en origen                |
-| **En Ruta**           | Viaje en marcha – estado principal del día a día   | Solo unidades en tránsito              |
-| **En Destino**        | Acaba de llegar al destino                         | Solo unidades en destino               |
-| **Retrasado**         | ETA peor que la planificada (leve o grave)         | Solo unidades con retraso               |
-| **Excursión Térmica** | Temperatura fuera de rango – alarma máxima         | Solo unidades con alerta térmica       |
-| **Finalizado**        | Descargado y auditoría OK – desaparece del mapa    | Solo viajes completados                |
+| Tab UI            | ID interno         | Regla de filtrado implementada                                                                 |
+| :---------------- | :----------------- | :---------------------------------------------------------------------------------------------- |
+| **Tracking**      | `live-tracking`    | Muestra todas las unidades visibles en el universo de tracking (`true`).                       |
+| **En Ejecución**  | `active-orders`    | Unidades con viaje activo (`hasActiveTrip = executionSubstatus != null && != DELIVERED`).     |
+| **En Tránsito**   | `in-transit`       | `executionSubstatus === IN_TRANSIT`.                                                           |
+| **En Destino**    | `at-destination`   | `executionSubstatus === AT_DESTINATION`.                                                       |
+| **Completadas**   | `delivered`        | `executionSubstatus === DELIVERED`.                                                            |
 
-> **⚠️ Nota:** El tab "Todos" muestra también unidades **sin viaje activo** (tracking general de flota), mientras que el resto de tabs solo muestran unidades con viajes asignados.
+> **Nota:** Los botones visuales de filtros adicionales (`Estado`, `Transportista`, `Tipo de Vehículo`) están en el header, pero hoy no aplican filtrado de datos en la consulta.
 
 ## Lista de Unidades
 
@@ -89,6 +86,19 @@ Panel lateral con tarjetas compactas de cada unidad.
 - **Geocercas** de origen/destino visibles
 - **Ruta planificada** vs **ruta real** (cuando aplica)
 - **Clustering** de unidades cercanas
+
+### Semántica de Color para Puntos de Temperatura (Marker)
+
+Para el marker de Control Tower, cada compartimiento térmico debe mostrar su punto de estado con esta convención:
+
+- `primaryCold` (dentro de rango): `primary`
+- `warning` (desviación): `var(--color-orange-500)`
+- `critical` (crítico/excursión): `var(--color-red-600)`
+- `neutral` (sin actividad / `STALE` / `OFFLINE` en marker): `var(--color-gray-400)`
+
+**Regla de render:**
+- **Standard:** `[Barra] + [Placa] [T1] [Punto]`
+- **Híbrido:** `[Barra] + [Placa] [T1] [Punto] | [T2] [Punto]`
 
 ## Drawer de Detalles de Unidad
 
@@ -158,22 +168,24 @@ Panel flotante inferior que aparece al seleccionar una unidad. Tiene **3 estados
 - **Botón ↓:** Contraer (Completo → Medio o Medio → Minimizado)
 - **Botón X:** Cerrar drawer completamente
 
-## Estados Operativos en Control Tower (Modelo Stage + Substatus)
+## Estados Operativos en Control Tower (Modelo StageStatus: Stage + Substatus)
 
 > **Referencia completa:** Ver [Gestión de Estados](./state-orders.md) para el modelo global de 5 etapas.
 
-La Torre de Control muestra órdenes en las etapas **SCHEDULED** y **EXECUTION**:
+La Torre de Control filtra estado de órdenes sobre el modelo `stage + substatus`, y actualmente consume:
+
+- `stage = EXECUTION`
+- `substatus in (IN_TRANSIT, AT_DESTINATION, DELIVERED)`
+
+Mapeo actual de substatus en la UI:
 
 | Stage | Substatus | Nombre en UI | Comentario operativo |
 | :---- | :-------- | :----------- | :------------------- |
-| SCHEDULED | `PROGRAMMED` | Programado | Ticket enviado, aún no salió de su base |
-| SCHEDULED | `AT_ORIGIN` | En Origen | Dentro de geocerca de carga (cargando o esperando) |
-| SCHEDULED | `LOADING` | En Carga | Checklist aprobado, carga en proceso |
 | EXECUTION | `IN_TRANSIT` | En Ruta | Viaje en marcha – estado principal del día a día |
 | EXECUTION | `AT_DESTINATION` | En Destino | Acaba de llegar al destino |
 | EXECUTION | `DELIVERED` | Entregado | POD recibido – pasa a CONCILIATION |
 
-> **Nota:** "Retrasado" y "Excursión Térmica" no son substatus sino **flags calculados** superpuestos al estado actual. Una orden `IN_TRANSIT` con alerta térmica sigue siendo `EXECUTION/IN_TRANSIT` — la alerta es contexto adicional, no un cambio de estado.
+> **Nota importante:** En Control Tower también existe un **estado operativo de unidad** (telemetría) separado del StageStatus de orden. Ejemplo: `THERMAL_EXCURSION`, `STALE`, `OFFLINE` son estados operativos/flags de tracking y no substatus de `dispatch_orders`.
 
 ## Tracking de Flota General vs Tracking de Viaje
 
@@ -183,14 +195,14 @@ La Torre de Control muestra órdenes en las etapas **SCHEDULED** y **EXECUTION**
 - Unidades visibles incluso **sin viaje activo**
 - Útil para planificar asignaciones futuras
 - Muestra ubicación actual, estado del vehículo y conductor disponible
-- Visible en tab "Todos"
+- Visible en tab **Tracking**
 
 **Nivel 2: Tracking de Viaje Activo**
 - Solo unidades con viaje asignado
 - Incluye información de carga, origen, destino y ETA
 - Monitoreo de cumplimiento térmico y ruta
 - Alertas operativas específicas del viaje
-- Visible en tabs específicos (En Ruta, Retrasado, etc.)
+- Visible en tabs de ejecución: **En Ejecución**, **En Tránsito**, **En Destino**, **Completadas**
 
 ## Orquestación de Alertas
 
@@ -239,4 +251,3 @@ La Torre de Control muestra órdenes en las etapas **SCHEDULED** y **EXECUTION**
 ---
 
 **Última actualización:** Enero 2026
-

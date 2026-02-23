@@ -64,6 +64,12 @@ Esta carpeta contiene la documentación de las reglas de negocio y procesos oper
   - Roles y permisos
   - Invitaciones y accesos
 
+- **[Authentication](./authentication.md)** - Sistema de autenticación y autorización
+  - Supabase Auth y flujos de autenticación
+  - Roles del sistema (Platform Admin, Organization Owner, etc.)
+  - Protección de rutas y verificación de permisos
+  - Sistema de invitaciones con magic links
+
 ## 🎯 Conceptos Clave
 
 ### Tipos de Vehículos

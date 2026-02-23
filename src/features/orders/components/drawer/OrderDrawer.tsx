@@ -290,8 +290,8 @@ export function OrderDrawer({
               className="shrink-0 border-t border-gray-200 px-6 py-3 bg-white flex gap-3 items-center"
               style={{ minHeight: '60px' }}
             >
-              {/* Show different actions based on order status */}
-              {order?.status === 'PENDING' || order?.status === 'SOLICITUD' ? (
+              {/* Show different actions based on order substatus */}
+              {order?.substatus === 'PENDING' ? (
                 <>
                   <Button
                     variant="outline"
@@ -317,7 +317,7 @@ export function OrderDrawer({
                     {hasFleetsetChanged ? "Aceptar con Cambios" : "Aceptar"}
                   </PrimaryButton>
                 </>
-              ) : (order?.status === 'ACCEPTED' || order?.status === 'SCHEDULED' || order?.status === 'COMPLETED') ? (
+              ) : (['ACCEPTED', 'PROGRAMMED', 'DISPATCHED', 'EN_ROUTE_TO_ORIGIN', 'AT_ORIGIN', 'LOADING'].includes(order?.substatus || '')) ? (
                 <Button
                   variant="destructive"
                   size="sm"

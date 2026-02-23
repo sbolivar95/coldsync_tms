@@ -1,47 +1,46 @@
 import { memo } from "react";
-import { TrackingUnit } from "../utils/mock-data";
+import { TriangleAlert } from "lucide-react";
+import { TrackingUnit } from "../types";
+import { MobilityIndicator } from "./MobilityIndicator";
 
 interface FleetUnitMarkerProps {
     unit: TrackingUnit;
     isSelected: boolean;
 }
 
-/**
- * FleetUnitMarker - ColdSync "Thermal Spectrum" Edition
- * 
- * Replaces generic Green with ColdSync Primary Blue for optimal cold.
- * Spectrum:
- * - Blue (Primary): Optimal Cold / In Range
- * - Amber: Thermal Deviation (Warning)
- * - Red: Excursion (Critical)
- */
+const TOKENS = {
+    primaryCold: "var(--color-blue-600)",
+    neutral: "var(--color-gray-400)",
+    surface: "var(--color-white)",
+    textPrimary: "var(--color-gray-900)",
+    border: "var(--border)"
+} as const;
+
 const FleetUnitMarkerComponent = memo(({ unit, isSelected }: FleetUnitMarkerProps) => {
+    const showNeutralThermal = unit.signalStatus === "OFFLINE" || unit.signalStatus === "STALE" || !unit.hasKnownMessage;
+    const activeColor = showNeutralThermal ? TOKENS.neutral : TOKENS.primaryCold;
+    const tempColor = "var(--color-gray-700)";
 
-    // ColdSync Professional Palette
-    const tokens = {
-        primaryCold: "var(--color-blue-600)",    // Brand Blue = Safe Cold
-        warning: "var(--color-orange-500)",     // Approaching boundary
-        critical: "var(--color-red-600)",       // Excursion
-        neutral: "var(--color-gray-400)",        // Stopped / Inactive
-        surface: "var(--color-white)",
-        textPrimary: "var(--color-gray-900)",
-        border: "var(--border)"
-    };
-
-    // Thermal Health Logic
-    const isThermalAlert = unit.status === "Excursión Térmica" || !!unit.reeferError;
-    // Mocking a warning state if temperature is not "perfect" (based on status or values)
-    const isWarning = unit.status === "Retrasado" || (unit.reeferError?.severity === "warning");
-
-    const getThermalColor = () => {
-        if (isThermalAlert) return tokens.critical;
-        if (isWarning) return tokens.warning;
-        if (unit.status === "Detenido") return tokens.neutral;
-        return tokens.primaryCold; // Blue as the new "Success" color
-    };
-
-    const activeColor = getThermalColor();
-
+    const tempEntries = unit.tempMode === "MULTI"
+        ? [
+            {
+                value: unit.temperatureChannel1 ?? "--",
+                hasError: Boolean(unit.hasTemperatureChannel1Error),
+                errorTitle: "Error en sensor de temperatura 1",
+            },
+            {
+                value: unit.temperatureChannel2 ?? "--",
+                hasError: Boolean(unit.hasTemperatureChannel2Error),
+                errorTitle: "Error en sensor de temperatura 2",
+            },
+        ]
+        : [
+            {
+                value: unit.temperature ?? "--",
+                hasError: Boolean(unit.hasTemperatureError),
+                errorTitle: "Error de sensor de temperatura",
+            },
+        ];
     return (
         <div
             style={{
@@ -66,29 +65,24 @@ const FleetUnitMarkerComponent = memo(({ unit, isSelected }: FleetUnitMarkerProp
                 {/* COMPACT PRECISION BAR */}
                 <div
                     style={{
-                        backgroundColor: tokens.surface,
+                        backgroundColor: TOKENS.surface,
                         display: 'flex',
                         alignItems: 'center',
-                        height: '30px',
+                        height: '32px',
                         borderRadius: '6px',
                         padding: '2px',
-                        border: `1px solid ${tokens.border}`,
+                        border: `1px solid ${TOKENS.border}`,
                         boxShadow: isSelected
                             ? `0 12px 24px -10px ${activeColor}44`
                             : '0 4px 10px rgba(0, 0, 0, 0.08)',
                         overflow: 'hidden',
-                        minWidth: '100px',
+                        minWidth: '112px',
                         gap: '8px'
                     }}
                 >
-                    {/* STATUS STRIPE (Now reflects Thermal Health) */}
-                    <div style={{
-                        width: '6px',
-                        height: '100%',
-                        backgroundColor: activeColor,
-                        borderRadius: '4px',
-                        flexShrink: 0
-                    }} />
+                    <div style={{ marginLeft: '2px', display: 'flex', alignItems: 'center' }}>
+                        <MobilityIndicator unit={unit} arrowSize={13} shapeSize={10} />
+                    </div>
 
                     {/* DATA PAYLOAD */}
                     <div style={{
@@ -100,11 +94,14 @@ const FleetUnitMarkerComponent = memo(({ unit, isSelected }: FleetUnitMarkerProp
                     }}>
                         {/* Unit ID */}
                         <span style={{
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            color: tokens.textPrimary,
-                            letterSpacing: '-0.3px',
-                            whiteSpace: 'nowrap'
+                            fontSize: '12.5px',
+                            fontWeight: 800,
+                            color: TOKENS.textPrimary,
+                            letterSpacing: '-0.2px',
+                            whiteSpace: 'nowrap',
+                            maxWidth: '86px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
                         }}>
                             {unit.unit}
                         </span>
@@ -112,40 +109,62 @@ const FleetUnitMarkerComponent = memo(({ unit, isSelected }: FleetUnitMarkerProp
                         {/* Technical Divider */}
                         <div style={{
                             width: '1px',
-                            height: '14px',
-                            backgroundColor: tokens.border,
+                            height: '12px',
+                            backgroundColor: TOKENS.border,
                             opacity: 0.8
                         }} />
 
-                        {/* Temperature (The Master Metric) */}
+                        {/* Temperature by compartment:
+                            Standard -> [T]
+                            Hybrid -> [T1] | [T2]
+                            Error channel -> [--] [ErrorIcon]
+                        */}
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'flex-end',
-                            flex: 1
+                            flex: 1,
+                            gap: '6px'
                         }}>
-                            <span style={{
-                                fontSize: '13px',
-                                fontWeight: 800,
-                                color: activeColor, // Temperature text matches health color
-                                fontVariantNumeric: 'tabular-nums',
-                                letterSpacing: '-0.5px'
-                            }}>
-                                {unit.temperature}
-                            </span>
+                            {tempEntries.map((entry, index) => (
+                                <div
+                                    key={`temp-${index}`}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '5px'
+                                    }}
+                                >
+                                    <span style={{
+                                        fontSize: '11px',
+                                        fontWeight: 700,
+                                        color: tempColor,
+                                        fontVariantNumeric: 'tabular-nums',
+                                        letterSpacing: '-0.2px',
+                                        whiteSpace: 'nowrap'
+                                    }}>
+                                        {entry.value}
+                                    </span>
+                                    {entry.hasError ? (
+                                        <span title={entry.errorTitle}>
+                                            <TriangleAlert
+                                                size={11}
+                                                color="var(--color-orange-500)"
+                                            />
+                                        </span>
+                                    ) : null}
+                                    {index < tempEntries.length - 1 && (
+                                        <span style={{
+                                            color: TOKENS.border,
+                                            fontWeight: 600,
+                                            fontSize: '11px'
+                                        }}>
+                                            |
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
                         </div>
-
-                        {/* Blinking dot for alerts */}
-                        {(isThermalAlert || isWarning || unit.status === "En Ruta") && (
-                            <div style={{
-                                width: '6px',
-                                height: '6px',
-                                borderRadius: '50%',
-                                backgroundColor: activeColor,
-                                flexShrink: 0,
-                                animation: (isThermalAlert || isWarning) ? 'pulse 1.5s infinite' : 'none'
-                            }} />
-                        )}
                     </div>
                 </div>
 
@@ -155,7 +174,7 @@ const FleetUnitMarkerComponent = memo(({ unit, isSelected }: FleetUnitMarkerProp
                     height: 0,
                     borderLeft: '7px solid transparent',
                     borderRight: '7px solid transparent',
-                    borderTop: `7px solid ${tokens.surface}`,
+                    borderTop: `7px solid ${TOKENS.surface}`,
                     marginTop: '-1px',
                     filter: isSelected ? 'none' : 'drop-shadow(0 2px 1px rgba(0,0,0,0.05))'
                 }} />

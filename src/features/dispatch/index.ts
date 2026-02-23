@@ -6,7 +6,7 @@ export * from './views/gantt';
 export * from './views/list';
 
 // Order Detail (Creation)
-export * from './order_detail';
+export * from './views/order_detail';
 
 // Components
 export * from './components';

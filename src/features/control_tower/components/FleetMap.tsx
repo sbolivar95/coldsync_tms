@@ -1,13 +1,14 @@
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
     Map,
     useMap,
     AdvancedMarker,
+    Marker,
     useMapsLibrary
 } from "@vis.gl/react-google-maps";
 import { MapSideControls } from "../../../components/widgets/MapControls";
-import { TrackingUnit } from "../utils/mock-data";
+import { TrackingUnit } from "../types";
 import FleetUnitMarker from "./FleetUnitMarker";
 
 interface FleetMapProps {
@@ -19,8 +20,10 @@ interface FleetMapProps {
 export function FleetMap({ units, selectedUnit, onUnitClick }: FleetMapProps) {
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapTypeId, setMapTypeId] = useState<string>("roadmap");
+    const [advancedMarkersAvailable, setAdvancedMarkersAvailable] = useState(true);
     const map = useMap();
     const coreLibrary = useMapsLibrary("core");
+    const markerLibrary = useMapsLibrary("marker");
 
     // Default center (Bolivia Center)
     const defaultCenter = { lat: -17.3895, lng: -66.1568 }; // Cochabamba as central reference
@@ -29,21 +32,56 @@ export function FleetMap({ units, selectedUnit, onUnitClick }: FleetMapProps) {
     const [zoom, setZoom] = useState(6);
 
     const hasFittedRef = useRef<boolean>(false);
+    const unitsWithCoordinates = useMemo(
+        () => units.filter((unit) => unit.coordinates !== null),
+        [units]
+    );
+    const mapId = import.meta.env.VITE_GOOGLE_MAP_ID || "DEMO_MAP_ID";
+    const collisionBehavior =
+        markerLibrary?.CollisionBehavior?.OPTIONAL_AND_HIDES_LOWER_PRIORITY ??
+        "OPTIONAL_AND_HIDES_LOWER_PRIORITY";
+
+    useEffect(() => {
+        if (!map || typeof map.getMapCapabilities !== "function") return;
+
+        const updateMapCapabilities = () => {
+            const capabilities = map.getMapCapabilities() as { isAdvancedMarkersAvailable?: boolean };
+            if (typeof capabilities?.isAdvancedMarkersAvailable === "boolean") {
+                setAdvancedMarkersAvailable(capabilities.isAdvancedMarkersAvailable);
+            }
+        };
+
+        updateMapCapabilities();
+        const listener = map.addListener("mapcapabilities_changed", updateMapCapabilities);
+
+        return () => listener.remove();
+    }, [map]);
+
+    useEffect(() => {
+        if (mapId === "DEMO_MAP_ID") {
+            console.warn(
+                "Using DEMO_MAP_ID fallback. Configure VITE_GOOGLE_MAP_ID with your Cloud Map ID for production."
+            );
+        }
+    }, [mapId]);
 
     // Initial boundary fit when units and map are ready
     useEffect(() => {
-        if (!map || !coreLibrary || units.length === 0 || hasFittedRef.current) return;
+        if (!map || !coreLibrary || unitsWithCoordinates.length === 0 || hasFittedRef.current) return;
 
         const bounds = new coreLibrary.LatLngBounds();
-        units.forEach(u => bounds.extend(u.coordinates));
+        unitsWithCoordinates.forEach((unit) => {
+            if (!unit.coordinates) return;
+            bounds.extend(unit.coordinates);
+        });
 
         map.fitBounds(bounds, 50);
         hasFittedRef.current = true;
-    }, [map, coreLibrary, units]);
+    }, [map, coreLibrary, unitsWithCoordinates]);
 
     // Pan and zoom when a unit is selected
     useEffect(() => {
-        if (selectedUnit && map) {
+        if (selectedUnit?.coordinates && map) {
             map.panTo(selectedUnit.coordinates);
             const currentZoom = map.getZoom() || 4;
             if (currentZoom < 12) {
@@ -57,9 +95,12 @@ export function FleetMap({ units, selectedUnit, onUnitClick }: FleetMapProps) {
     };
 
     const handleCenterMap = () => {
-        if (!map || !coreLibrary || units.length === 0) return;
+        if (!map || !coreLibrary || unitsWithCoordinates.length === 0) return;
         const bounds = new coreLibrary.LatLngBounds();
-        units.forEach(u => bounds.extend(u.coordinates));
+        unitsWithCoordinates.forEach((unit) => {
+            if (!unit.coordinates) return;
+            bounds.extend(unit.coordinates);
+        });
         map.fitBounds(bounds, 50);
     };
 
@@ -76,7 +117,7 @@ export function FleetMap({ units, selectedUnit, onUnitClick }: FleetMapProps) {
             )}
 
             <Map
-                mapId="FLEET_MONITOR_MAP"
+                mapId={mapId}
                 defaultCenter={center}
                 defaultZoom={zoom}
                 mapTypeId={mapTypeId}
@@ -95,21 +136,35 @@ export function FleetMap({ units, selectedUnit, onUnitClick }: FleetMapProps) {
                     showCenter={true}
                 />
 
-                {units.map((unit) => (
-                    <AdvancedMarker
-                        key={unit.id}
-                        position={unit.coordinates}
-                        onClick={() => onUnitClick(unit.id)}
-                        zIndex={selectedUnit?.id === unit.id ? 1000 : 10}
-                        collisionBehavior="OPTIONAL_AND_HIDES_LOWER_PRIORITY"
-                        title={unit.unit}
-                    >
-                        <FleetUnitMarker
-                            unit={unit}
-                            isSelected={selectedUnit?.id === unit.id}
-                        />
-                    </AdvancedMarker>
-                ))}
+                {unitsWithCoordinates.map((unit) => {
+                    if (!unit.coordinates) return null;
+                    return (
+                        advancedMarkersAvailable ? (
+                            <AdvancedMarker
+                                key={unit.id}
+                                position={unit.coordinates}
+                                onClick={() => onUnitClick(unit.id)}
+                                zIndex={selectedUnit?.id === unit.id ? 1000 : 10}
+                                collisionBehavior={collisionBehavior}
+                                anchorLeft="-50%"
+                                anchorTop="-100%"
+                                title={unit.unit}
+                            >
+                                <FleetUnitMarker
+                                    unit={unit}
+                                    isSelected={selectedUnit?.id === unit.id}
+                                />
+                            </AdvancedMarker>
+                        ) : (
+                            <Marker
+                                key={unit.id}
+                                position={unit.coordinates}
+                                onClick={() => onUnitClick(unit.id)}
+                                zIndex={selectedUnit?.id === unit.id ? 1000 : 10}
+                                title={unit.unit}
+                            />
+                        )
+                )})}
             </Map>
         </div>
     );

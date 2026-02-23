@@ -19,10 +19,12 @@ import { Textarea } from "../ui/Textarea";
 interface BaseFieldProps {
   label: string;
   id: string;
+  name?: string;
   required?: boolean;
   helpText?: string;
   error?: string;
   disabled?: boolean;
+  "aria-label"?: string; // Support for accessibility
 }
 
 interface InputFieldProps extends BaseFieldProps {
@@ -58,6 +60,7 @@ interface TextareaFieldProps extends BaseFieldProps {
 export function InputField({
   label,
   id,
+  name,
   required = false,
   helpText,
   error,
@@ -70,18 +73,22 @@ export function InputField({
   className,
   highlight = "default",
   step,
+  "aria-label": ariaLabel,
 }: InputFieldProps) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-xs text-gray-600">
-        {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-        {highlight === "critical" && (
-          <span className="ml-2 text-xs text-red-600 font-medium">(Crítico)</span>
-        )}
-      </Label>
+      {label && (
+        <Label htmlFor={id} className="text-xs text-gray-600">
+          {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+          {highlight === "critical" && (
+            <span className="ml-2 text-xs text-red-600 font-medium">(Crítico)</span>
+          )}
+        </Label>
+      )}
       <Input
         id={id}
+        name={name}
         type={type}
         step={step}
         placeholder={placeholder}
@@ -90,12 +97,13 @@ export function InputField({
         onChange={onChange}
         disabled={disabled}
         aria-invalid={!!error}
+        aria-label={ariaLabel || label}
         className={
           disabled
             ? "bg-gray-50 text-gray-500"
             : highlight === "critical"
-            ? "border-orange-200 focus:border-orange-400 focus:ring-orange-400"
-            : className
+              ? "border-orange-200 focus:border-orange-400 focus:ring-orange-400"
+              : className
         }
       />
       {helpText && !error && (
@@ -114,6 +122,7 @@ export function InputField({
 export function SelectField({
   label,
   id,
+  name,
   required = false,
   helpText,
   error,
@@ -123,20 +132,24 @@ export function SelectField({
   value,
   onValueChange,
   options,
+  "aria-label": ariaLabel,
 }: SelectFieldProps) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-xs text-gray-600">
-        {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </Label>
+      {label && (
+        <Label htmlFor={id} className="text-xs text-gray-600">
+          {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </Label>
+      )}
       <Select
+        name={name}
         defaultValue={defaultValue}
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}
       >
-        <SelectTrigger id={id} aria-invalid={!!error}>
+        <SelectTrigger id={id} aria-invalid={!!error} aria-label={ariaLabel || label}>
           <SelectValue placeholder={placeholder || "Seleccionar..."} />
         </SelectTrigger>
         <SelectContent>
@@ -163,6 +176,7 @@ export function SelectField({
 export function TextareaField({
   label,
   id,
+  name,
   required = false,
   helpText,
   error,
@@ -172,15 +186,19 @@ export function TextareaField({
   value,
   onChange,
   rows = 3,
+  "aria-label": ariaLabel,
 }: TextareaFieldProps) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-xs text-gray-600">
-        {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </Label>
+      {label && (
+        <Label htmlFor={id} className="text-xs text-gray-600">
+          {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </Label>
+      )}
       <Textarea
         id={id}
+        name={name}
         placeholder={placeholder}
         defaultValue={defaultValue}
         value={value}
@@ -188,6 +206,7 @@ export function TextareaField({
         disabled={disabled}
         rows={rows}
         aria-invalid={!!error}
+        aria-label={ariaLabel || label}
         className={disabled ? "bg-gray-50 text-gray-500" : ""}
       />
       {helpText && !error && (

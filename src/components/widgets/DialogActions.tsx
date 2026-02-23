@@ -1,6 +1,7 @@
-import { PrimaryButton } from "./PrimaryButton";
-import { SecondaryButton } from "./SecondaryButton";
-import { X, Save } from "lucide-react";
+import { SaveButton } from "./SaveButton";
+import { CancelButton } from "./CancelButton";
+import { DestructiveButton } from "./DestructiveButton";
+import { Trash2 } from "lucide-react";
 
 interface DialogActionsProps {
   onCancel: () => void;
@@ -8,30 +9,48 @@ interface DialogActionsProps {
   saveLabel?: string;
   cancelLabel?: string;
   disableSave?: boolean;
+  saveLoading?: boolean;
+  saveLoadingLabel?: string;
+  size?: "default" | "sm" | "lg" | "icon";
+  variant?: "default" | "destructive";
 }
 
 export function DialogActions({
   onCancel,
   onSave,
-  saveLabel = "Guardar",
-  cancelLabel = "Cancelar",
+  saveLabel,
+  cancelLabel,
   disableSave = false,
+  saveLoading = false,
+  saveLoadingLabel,
+  variant = "default",
 }: DialogActionsProps) {
   return (
     <div className="flex justify-end gap-3">
-      <SecondaryButton 
-        icon={X}
+      <CancelButton
         onClick={onCancel}
+        disabled={saveLoading}
       >
         {cancelLabel}
-      </SecondaryButton>
-      <PrimaryButton 
-        icon={Save}
-        onClick={onSave}
-        disabled={disableSave}
-      >
-        {saveLabel}
-      </PrimaryButton>
+      </CancelButton>
+      {variant === "destructive" ? (
+        <DestructiveButton
+          icon={Trash2}
+          onClick={onSave}
+          disabled={disableSave}
+        >
+          {saveLabel || "Eliminar"}
+        </DestructiveButton>
+      ) : (
+        <SaveButton
+          onClick={onSave}
+          disabled={disableSave}
+          isSubmitting={saveLoading}
+          submittingLabel={saveLoadingLabel}
+        >
+          {saveLabel}
+        </SaveButton>
+      )}
     </div>
   );
 }

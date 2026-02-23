@@ -168,6 +168,7 @@ export interface Route {
   code?: string;
   origins: string[];
   destinations: string[];
+  waypoints?: string[]; // Paradas intermedias opcionales
   distance: string;
   status: string;
   lastUpdate: string;
@@ -188,16 +189,36 @@ export interface Route {
   operationalMargin?: string;
 }
 
+export interface Organization {
+  id?: string;
+  comercial_name: string;
+  legal_name: string;
+  full_name?: string;
+  email?: string;
+  city?: string;
+  base_country_id: number;
+  status: "ACTIVE" | "INACTIVE";
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  last_access?: string;
+  invitation_code?: string;
+  invitation_expires_at?: string;
+}
+
 export interface User {
   id?: string;
   firstName: string;
   lastName: string;
   email: string;
   role: string;
-  status: string;
+  status: "Activo" | "Inactivo";
   phone: string;
+  organizationId?: string;
   lastAccess?: string;
   createdAt?: string;
+  invitationCode?: string;
+  invitationExpiresAt?: string;
   // Legacy Spanish field names (for backward compatibility during migration)
   nombre?: string;
   apellido?: string;
@@ -207,10 +228,25 @@ export interface User {
   telefono?: string;
   ultimoAcceso?: string;
   creado?: string;
+  codigoInvitacion?: string;
+  fechaExpiracionInvitacion?: string;
 }
 
 // Order Status Type
-export type OrderStatus = "unassigned" | "assigned" | "pending" | "scheduled" | "rejected" | "observed" | "dispatched" | "cancelled" | "at-destination";
+export type OrderStatus =
+  | "unassigned"
+  | "assigned"
+  | "pending"
+  | "accepted"
+  | "scheduled"
+  | "rejected"
+  | "expired"
+  | "observed"
+  | "fail_after_accept"
+  | "dispatched"
+  | "cancelled"
+  | "at-origin"
+  | "at-destination";
 
 // Compartment interface for hybrid orders (different from trailer compartments)
 export interface OrderCompartment {
@@ -226,6 +262,7 @@ export interface Order {
   configuration: "standard" | "hibrido" | "hybrid";
   status?: OrderStatus;
   routeId: string;
+  priority?: "normal" | "high" | "critical"; // Tender priority from Dispatch
   // For Standard configuration
   productId?: string;
   thermalProfileId?: string;
@@ -264,6 +301,10 @@ export interface Order {
   estado?: string;
   esHibrida?: boolean;
   isHybrid?: boolean;
+  // Unit status fields (for Orders display)
+  unitStatus?: string; // "En Ruta", "Detenido", "En Planta", "Offline", etc.
+  hasActiveTrip?: boolean; // Whether the unit has an active trip
+  hasIssue?: boolean; // Whether the unit has an issue/warning
 }
 
 // ============================================================================
@@ -275,16 +316,16 @@ export const mockCarriers: Carrier[] = [
   {
     id: "CAR-001",
     carrierType: "tercero",
-    commercialName: "ColdChain Express",
-    legalName: "ColdChain Express LLC",
-    taxId: "NIT 123456789",
+    commercialName: "TransFrío Santa Cruz",
+    legalName: "Transporte Frigorífico Santa Cruz S.R.L.",
+    taxId: "NIT 1029384756",
     baseCountry: "Bolivia",
-    city: "La Paz",
-    legalRepresentative: "John Martinez",
+    city: "Santa Cruz",
+    legalRepresentative: "Juan Pablo Mendoza",
     status: "Activo",
-    operationsContact: "John Martinez",
-    phone: "(555) 010-1234",
-    email: "ops@coldchainexpress.com",
+    operationsContact: "Juan Pablo Mendoza",
+    phone: "+591 710 12345",
+    email: "ops@transfrioscz.bo",
     numVehicles: 1,
     numDrivers: 1,
     numTrailers: 1,
@@ -292,7 +333,7 @@ export const mockCarriers: Carrier[] = [
     contractExpiration: "2025-12-31",
     policyValid: true,
     policyExpiration: "2025-06-30",
-    baseCurrency: "USD",
+    baseCurrency: "BOB",
     paymentTerms: "30 días FF",
     documentsComplete: true,
     contractUploaded: true,
@@ -302,16 +343,16 @@ export const mockCarriers: Carrier[] = [
   {
     id: "CAR-002",
     carrierType: "propia",
-    commercialName: "FrostLine Logistics",
-    legalName: "FrostLine Logistics S.A.",
-    taxId: "RUC 987654321",
-    baseCountry: "Perú",
-    city: "Lima",
-    legalRepresentative: "Sarah Johnson",
+    commercialName: "Logística del Oriente",
+    legalName: "Inversiones Logísticas del Oriente S.A.",
+    taxId: "NIT 9876543210",
+    baseCountry: "Bolivia",
+    city: "Santa Cruz",
+    legalRepresentative: "Sarah Williams",
     status: "Activo",
-    operationsContact: "Sarah Johnson",
-    phone: "(555) 010-2345",
-    email: "ops@frostlinelogistics.com",
+    operationsContact: "Sarah Williams",
+    phone: "+591 720 23456",
+    email: "ops@logisticaoriente.bo",
     numVehicles: 1,
     numDrivers: 1,
     numTrailers: 1,
@@ -319,7 +360,7 @@ export const mockCarriers: Carrier[] = [
     contractExpiration: "2026-03-15",
     policyValid: false,
     policyExpiration: "2025-01-15",
-    baseCurrency: "PEN",
+    baseCurrency: "BOB",
     paymentTerms: "45 días FF",
     documentsComplete: false,
     contractUploaded: true,
@@ -329,16 +370,16 @@ export const mockCarriers: Carrier[] = [
   {
     id: "CAR-003",
     carrierType: "tercero",
-    commercialName: "Arctic Transport",
-    legalName: "Arctic Transport Inc",
-    taxId: "RUT 456789123",
-    baseCountry: "Chile",
-    city: "Santiago",
-    legalRepresentative: "Mike Chen",
+    commercialName: "Andino Cold Express",
+    legalName: "Andino Cold Express Transporte Internacional",
+    taxId: "NIT 4567891234",
+    baseCountry: "Bolivia",
+    city: "La Paz",
+    legalRepresentative: "Roberto Choque",
     status: "Activo",
-    operationsContact: "Mike Chen",
-    phone: "(555) 010-3456",
-    email: "ops@arctictransport.com",
+    operationsContact: "Roberto Choque",
+    phone: "+591 730 34567",
+    email: "ops@andinocold.bo",
     numVehicles: 1,
     numDrivers: 1,
     numTrailers: 1,
@@ -356,16 +397,16 @@ export const mockCarriers: Carrier[] = [
   {
     id: "CAR-004",
     carrierType: "propia",
-    commercialName: "TempGuard Freight",
-    legalName: "TempGuard Freight S.R.L.",
-    taxId: "NIT 789456123",
+    commercialName: "FrostLine Bolivia",
+    legalName: "FrostLine Logistics Bolivia S.R.L.",
+    taxId: "NIT 7894561230",
     baseCountry: "Bolivia",
-    city: "Santa Cruz",
+    city: "Cochabamba",
     legalRepresentative: "Lisa Rodriguez",
     status: "Activo",
     operationsContact: "Lisa Rodriguez",
-    phone: "(555) 010-4567",
-    email: "contact@tempguardfreight.com",
+    phone: "+591 740 45678",
+    email: "contacto@frostline.bo",
     numVehicles: 1,
     numDrivers: 1,
     numTrailers: 1,
@@ -392,10 +433,10 @@ export const mockVehicles: Vehicle[] = [
     model: "Cascadia",
     year: "2022",
     vin: "1FUJGLDR2NLBV1234",
-    licensePlate: "TX-9876AB",
-    carrier: "ColdChain Express",
+    licensePlate: "4020-ABC",
+    carrier: "TransFrío Santa Cruz",
     status: "Activo",
-    mileage: "125,450 mi",
+    mileage: "125.450 km",
     numberOfAxles: 3,
     assignedDriver: "Michael Johnson",
     assignedTrailer: "TRL-5001"
@@ -408,10 +449,10 @@ export const mockVehicles: Vehicle[] = [
     model: "T680",
     year: "2021",
     vin: "1XKYDP9X5MJ234567",
-    licensePlate: "CA-5432CD",
-    carrier: "FrostLine Logistics",
+    licensePlate: "3515-XYZ",
+    carrier: "Logística del Oriente",
     status: "Activo",
-    mileage: "156,780 mi",
+    mileage: "156.780 km",
     numberOfAxles: 3,
     assignedDriver: "Sarah Williams",
     assignedTrailer: "TRL-5002"
@@ -424,12 +465,12 @@ export const mockVehicles: Vehicle[] = [
     model: "VNL 760",
     year: "2023",
     vin: "4V4NC9TH7PN345678",
-    licensePlate: "IL-8765EF",
-    carrier: "Arctic Transport",
+    licensePlate: "2842-IJK",
+    carrier: "Andino Cold Express",
     status: "Activo",
-    mileage: "89,320 mi",
+    mileage: "89.320 km",
     numberOfAxles: 2,
-    assignedDriver: "Robert Chen",
+    assignedDriver: "Roberto Choque",
     assignedTrailer: null
   },
   {
@@ -440,10 +481,10 @@ export const mockVehicles: Vehicle[] = [
     model: "579",
     year: "2022",
     vin: "1XPBDP9X6ND456789",
-    licensePlate: "GA-2341GH",
-    carrier: "TempGuard Freight",
+    licensePlate: "5291-LMN",
+    carrier: "FrostLine Bolivia",
     status: "Mantenimiento",
-    mileage: "142,890 mi",
+    mileage: "142.890 km",
     numberOfAxles: 3,
     assignedDriver: null,
     assignedTrailer: null
@@ -456,10 +497,10 @@ export const mockVehicles: Vehicle[] = [
     model: "LT Series",
     year: "2021",
     vin: "3AKJGLDR9LSJM5678",
-    licensePlate: "WA-6789IJ",
+    licensePlate: "3388-OPQ",
     carrier: "Glacier Hauling",
     status: "Activo",
-    mileage: "178,450 mi",
+    mileage: "178.450 km",
     numberOfAxles: 3,
     assignedDriver: "David Kim",
     assignedTrailer: "TRL-5005"
@@ -472,12 +513,12 @@ export const mockVehicles: Vehicle[] = [
     model: "Anthem",
     year: "2020",
     vin: "1M2AX09C8KM678901",
-    licensePlate: "MA-4567KL",
+    licensePlate: "4421-RST",
     carrier: "Polar Express",
     status: "Activo",
-    mileage: "210,560 mi",
+    mileage: "210.560 km",
     numberOfAxles: 3,
-    assignedDriver: "Amanda Taylor",
+    assignedDriver: "Emma Davis",
     assignedTrailer: "TRL-5006"
   },
   {
@@ -488,10 +529,10 @@ export const mockVehicles: Vehicle[] = [
     model: "Cascadia",
     year: "2023",
     vin: "1FUJGLDR1PLBV7890",
-    licensePlate: "TX-1234MN",
+    licensePlate: "5582-UVW",
     carrier: "IceRoad Transport",
     status: "Activo",
-    mileage: "67,230 mi",
+    mileage: "67.230 km",
     numberOfAxles: 2,
     assignedDriver: "Carlos Martinez",
     assignedTrailer: null
@@ -504,10 +545,10 @@ export const mockVehicles: Vehicle[] = [
     model: "W990",
     year: "2022",
     vin: "1XKYDP9X1NJ890123",
-    licensePlate: "MO-7890OP",
+    licensePlate: "2194-DEF",
     carrier: "FreezeFleet",
     status: "Inactivo",
-    mileage: "195,670 mi",
+    mileage: "195.670 km",
     numberOfAxles: 3,
     assignedDriver: null,
     assignedTrailer: null
@@ -519,10 +560,10 @@ export const mockDrivers: Driver[] = [
   {
     id: "DRV-001",
     name: "Michael Johnson",
-    license: "CDL-TX-456789",
-    phone: "(555) 123-4567",
-    email: "mjohnson@email.com",
-    carrier: "ColdChain Express",
+    license: "LIC-BO-456789",
+    phone: "+591 710 11223",
+    email: "mjohnson@transfrioscz.bo",
+    carrier: "TransFrío Santa Cruz",
     status: "Disponible",
     assignedVehicle: "TRK-1024",
     assignedTrailer: "TRL-5001"
@@ -530,21 +571,21 @@ export const mockDrivers: Driver[] = [
   {
     id: "DRV-002",
     name: "Sarah Williams",
-    license: "CDL-CA-789012",
-    phone: "(555) 234-5678",
-    email: "swilliams@email.com",
-    carrier: "FrostLine Logistics",
+    license: "LIC-BO-789012",
+    phone: "+591 720 22334",
+    email: "swilliams@logisticaoriente.bo",
+    carrier: "Logística del Oriente",
     status: "En Ruta",
     assignedVehicle: "TRK-2051",
     assignedTrailer: "TRL-5002"
   },
   {
     id: "DRV-003",
-    name: "Robert Chen",
-    license: "CDL-IL-345678",
-    phone: "(555) 345-6789",
-    email: "rchen@email.com",
-    carrier: "Arctic Transport",
+    name: "Roberto Choque",
+    license: "LIC-BO-345678",
+    phone: "+591 730 33445",
+    email: "rchoque@andinocold.bo",
+    carrier: "Andino Cold Express",
     status: "Disponible",
     assignedVehicle: "TRK-3012",
     assignedTrailer: null
@@ -552,10 +593,10 @@ export const mockDrivers: Driver[] = [
   {
     id: "DRV-004",
     name: "Lisa Rodriguez",
-    license: "CDL-GA-901234",
-    phone: "(555) 456-7890",
-    email: "lrodriguez@email.com",
-    carrier: "TempGuard Freight",
+    license: "LIC-BO-901234",
+    phone: "+591 740 44556",
+    email: "lrodriguez@frostline.bo",
+    carrier: "FrostLine Bolivia",
     status: "Descanso",
     assignedVehicle: null,
     assignedTrailer: null
@@ -563,9 +604,9 @@ export const mockDrivers: Driver[] = [
   {
     id: "DRV-005",
     name: "David Kim",
-    license: "CDL-WA-567890",
-    phone: "(555) 567-8901",
-    email: "dkim@email.com",
+    license: "LIC-BO-567890",
+    phone: "+591 750 55667",
+    email: "dkim@glacier.bo",
     carrier: "Glacier Hauling",
     status: "En Ruta",
     assignedVehicle: "TRK-5123",
@@ -573,10 +614,10 @@ export const mockDrivers: Driver[] = [
   },
   {
     id: "DRV-006",
-    name: "Amanda Taylor",
-    license: "CDL-MA-678901",
-    phone: "(555) 678-9012",
-    email: "ataylor@email.com",
+    name: "Emma Davis",
+    license: "LIC-BO-678901",
+    phone: "+591 760 66778",
+    email: "edavis@polar.bo",
     carrier: "Polar Express",
     status: "Disponible",
     assignedVehicle: "TRK-6234",
@@ -585,9 +626,9 @@ export const mockDrivers: Driver[] = [
   {
     id: "DRV-007",
     name: "Carlos Martinez",
-    license: "CDL-TX-234567",
-    phone: "(555) 789-0123",
-    email: "cmartinez@email.com",
+    license: "LIC-BO-234567",
+    phone: "+591 770 77889",
+    email: "cmartinez@iceroad.bo",
     carrier: "IceRoad Transport",
     status: "Disponible",
     assignedVehicle: "TRK-7145",
@@ -596,9 +637,9 @@ export const mockDrivers: Driver[] = [
   {
     id: "DRV-008",
     name: "Jennifer Lee",
-    license: "CDL-MO-890123",
-    phone: "(555) 890-1234",
-    email: "jlee@email.com",
+    license: "LIC-BO-890123",
+    phone: "+591 780 88990",
+    email: "jlee@freeze.bo",
     carrier: "FreezeFleet",
     status: "Inactivo",
     assignedVehicle: null,
@@ -616,8 +657,8 @@ export const mockTrailers: Trailer[] = [
     model: "3000R",
     year: "2021",
     vin: "1UYVS25328M123456",
-    licensePlate: "TX-TR-1234",
-    carrier: "ColdChain Express",
+    licensePlate: "4201-TRC",
+    carrier: "TransFrío Santa Cruz",
     status: "Activo",
     tempRange: "-30°C a +30°C",
     capacity: "3,000 cu ft",
@@ -643,8 +684,8 @@ export const mockTrailers: Trailer[] = [
     model: "Everest",
     year: "2022",
     vin: "1GRAA06289W234567",
-    licensePlate: "CA-TR-5678",
-    carrier: "FrostLine Logistics",
+    licensePlate: "3516-TRB",
+    carrier: "Logística del Oriente",
     status: "Activo",
     tempRange: "-35°C a +25°C",
     capacity: "3,040 cu ft",
@@ -670,8 +711,8 @@ export const mockTrailers: Trailer[] = [
     model: "DuraPlate",
     year: "2023",
     vin: "1JJV532B6NL345678",
-    licensePlate: "IL-TR-9012",
-    carrier: "Arctic Transport",
+    licensePlate: "2843-TRD",
+    carrier: "Andino Cold Express",
     status: "Activo",
     tempRange: "N/A",
     capacity: "3,850 cu ft",
@@ -695,8 +736,8 @@ export const mockTrailers: Trailer[] = [
     model: "3000R",
     year: "2020",
     vin: "1UYVS25327M456789",
-    licensePlate: "GA-TR-3456",
-    carrier: "TempGuard Freight",
+    licensePlate: "5292-TRF",
+    carrier: "FrostLine Bolivia",
     status: "Mantenimiento",
     tempRange: "-25°C a +20°C",
     capacity: "2,700 cu ft",
@@ -721,7 +762,7 @@ export const mockTrailers: Trailer[] = [
     model: "SB-410",
     year: "2021",
     vin: "1GRAA06288W567890",
-    licensePlate: "WA-TR-7890",
+    licensePlate: "3389-TRG",
     carrier: "Glacier Hauling",
     status: "Activo",
     tempRange: "-30°C a +30°C",
@@ -747,7 +788,7 @@ export const mockTrailers: Trailer[] = [
     model: "Everest",
     year: "2019",
     vin: "1GRAA06287W678901",
-    licensePlate: "MA-TR-2345",
+    licensePlate: "4422-TRH",
     carrier: "Polar Express",
     status: "Activo",
     tempRange: "-28°C a +25°C",
@@ -773,14 +814,14 @@ export const mockTrailers: Trailer[] = [
     model: "Revolution",
     year: "2022",
     vin: "4FMCU13237J789012",
-    licensePlate: "TX-TR-6789",
+    licensePlate: "2195-TRJ",
     carrier: "IceRoad Transport",
     status: "Activo",
     tempRange: "N/A",
-    capacity: "45,000 lbs",
+    capacity: "20.5 Tn",
     lastInspection: "2024-01-15",
     reeferHours: "N/A",
-    capacityTons: 20,
+    capacityTons: 20.5,
     tareWeight: 4.5,
     palletsCapacity: 24,
     measurementUnit: "pallets",
@@ -797,15 +838,15 @@ export const mockTrailers: Trailer[] = [
     model: "4000D-X",
     year: "2021",
     vin: "1UYVS25329M890123",
-    licensePlate: "MO-TR-0123",
+    licensePlate: "5583-TRK",
     carrier: "FreezeFleet",
     status: "Inactivo",
     tempRange: "-20°C a +15°C",
-    capacity: "2,950 cu ft",
+    capacity: "83 m³",
     lastInspection: "2023-12-20",
     reeferHours: "10,560 hrs",
     capacityTons: 23,
-    volume: 68,
+    volume: 83,
     tareWeight: 6.3,
     palletsCapacity: 25,
     measurementUnit: "pallets",
@@ -895,6 +936,83 @@ export const mockLocations: Location[] = [
     docks: 8,
     status: "Activo",
     description: "Centro de recepción y distribución final de todo producto (pollo, embutido, cerdo, podium, huevo y congelado) en La Paz"
+  },
+  {
+    id: "CD-SCZ-NORTE",
+    name: "CD Santa Cruz Norte",
+    type: "Centro de distribución",
+    address: "Zona Industrial Norte, Av. Cristo Redentor km 8",
+    city: "Santa Cruz",
+    country: "Bolivia",
+    docks: 12,
+    status: "Activo",
+    description: "Centro de distribución principal zona norte"
+  },
+  {
+    id: "FRIGORIFICO-CBBA",
+    name: "Frigorífico Cochabamba",
+    type: "Frigorífico",
+    address: "Av. Blanco Galindo km 12, Quillacollo",
+    city: "Cochabamba",
+    country: "Bolivia",
+    docks: 6,
+    status: "Activo",
+    description: "Frigorífico y centro de almacenamiento refrigerado"
+  },
+  {
+    id: "KETAL-LPZ",
+    name: "Ketal La Paz",
+    type: "Supermercado",
+    address: "Av. Arce 2631, zona San Jorge",
+    city: "La Paz",
+    country: "Bolivia",
+    docks: 4,
+    status: "Activo",
+    description: "Supermercado Ketal - punto de entrega"
+  },
+  {
+    id: "PIL-ANDINA",
+    name: "Planta PIL Andina",
+    type: "Planta industrial",
+    address: "Carretera a Oruro km 7, El Alto",
+    city: "La Paz",
+    country: "Bolivia",
+    docks: 8,
+    status: "Activo",
+    description: "Planta industrial PIL Andina"
+  },
+  {
+    id: "HOSPITAL-JAPONES",
+    name: "Hospital Japonés",
+    type: "Hospital",
+    address: "Av. Japón entre 3er y 4to anillo",
+    city: "Santa Cruz",
+    country: "Bolivia",
+    docks: 2,
+    status: "Activo",
+    description: "Hospital Japonés - entrega de insumos médicos"
+  },
+  {
+    id: "PLANTA-DELIZIA",
+    name: "Planta Delizia",
+    type: "Planta industrial",
+    address: "Parque Industrial Sur, Manzana 15",
+    city: "Santa Cruz",
+    country: "Bolivia",
+    docks: 5,
+    status: "Activo",
+    description: "Planta de producción Delizia"
+  },
+  {
+    id: "PLANTA-SOFIA",
+    name: "Planta Sofía",
+    type: "Planta industrial",
+    address: "Zona Industrial Warnes km 3",
+    city: "Warnes",
+    country: "Bolivia",
+    docks: 4,
+    status: "Activo",
+    description: "Planta de producción Sofía"
   }
 ];
 
@@ -987,6 +1105,42 @@ export const mockRoutes: Route[] = [
     lastUpdate: "2025-11-27",
     routeType: "S-Nacional",
     rateMethod: "por-kilometro"
+  },
+  {
+    id: "RUT-003",
+    name: "CD Santa Cruz Norte → Hospital Japonés → Planta PIL Andina",
+    origins: ["CD Santa Cruz Norte"],
+    destinations: ["Planta PIL Andina"],
+    waypoints: ["Hospital Japonés"],
+    distance: "245",
+    status: "Activa",
+    lastUpdate: "2025-11-27",
+    routeType: "S-Nacional",
+    rateMethod: "por-kilometro"
+  },
+  {
+    id: "RUT-004",
+    name: "Planta Delizia → Planta Sofía → CD Santa Cruz Norte",
+    origins: ["Planta Delizia"],
+    destinations: ["CD Santa Cruz Norte"],
+    waypoints: ["Planta Sofía"],
+    distance: "189",
+    status: "Activa",
+    lastUpdate: "2025-11-27",
+    routeType: "S-Nacional",
+    rateMethod: "por-kilometro"
+  },
+  {
+    id: "RUT-005",
+    name: "CD Santa Cruz Norte → Frigorífico Cochabamba → Ketal La Paz → Planta PIL Andina",
+    origins: ["CD Santa Cruz Norte"],
+    destinations: ["Planta PIL Andina"],
+    waypoints: ["Frigorífico Cochabamba", "Ketal La Paz"],
+    distance: "612",
+    status: "Activa",
+    lastUpdate: "2025-11-27",
+    routeType: "S-Nacional",
+    rateMethod: "por-kilometro"
   }
 ];
 
@@ -1056,7 +1210,7 @@ export const mockHardware: Hardware[] = [
     id: "HW-001",
     telematicsProvider: "Geotab",
     connectionId: "356938035643809",
-    phone: "+1 (555) 234-5678",
+    phone: "+591 710 44556",
     hardwareBrand: "CalAmp",
     model: "LMU-4230",
     serialNumber: "SN-CAL-123456",
@@ -1069,7 +1223,7 @@ export const mockHardware: Hardware[] = [
     id: "HW-002",
     telematicsProvider: "Samsara",
     connectionId: "867698048532184",
-    phone: "+1 (555) 345-6789",
+    phone: "+591 720 55667",
     hardwareBrand: "Queclink",
     model: "GV500",
     serialNumber: "SN-QUE-234567",
@@ -1082,7 +1236,7 @@ export const mockHardware: Hardware[] = [
     id: "HW-003",
     telematicsProvider: "TracKing",
     connectionId: "359633103456782",
-    phone: "+1 (555) 456-7890",
+    phone: "+591 730 66778",
     hardwareBrand: "Teltonika",
     model: "FMB920",
     serialNumber: "SN-TEL-345678",
@@ -1095,7 +1249,7 @@ export const mockHardware: Hardware[] = [
     id: "HW-004",
     telematicsProvider: "Omnitracs",
     connectionId: "862173051234567",
-    phone: "+1 (555) 567-8901",
+    phone: "+591 740 77889",
     hardwareBrand: "CalAmp",
     model: "LMU-5530",
     serialNumber: "SN-CAL-456789",
@@ -1108,7 +1262,7 @@ export const mockHardware: Hardware[] = [
     id: "HW-005",
     telematicsProvider: "Verizon Connect",
     connectionId: "354678092345671",
-    phone: "+1 (555) 678-9012",
+    phone: "+591 750 88990",
     hardwareBrand: "Sierra Wireless",
     model: "RV50X",
     serialNumber: "SN-SIE-567890",
@@ -1198,6 +1352,7 @@ export function mapStatusToEnglish(status: string): OrderStatus {
     "observada": "observed",
     "despachada": "dispatched",
     "cancelada": "cancelled",
+    "en-origen": "at-origin",
     "en-destino": "at-destination",
   };
   return statusMap[status] || "unassigned";
@@ -1321,8 +1476,10 @@ export const mockUsers: User[] = [
     role: "Administrador",
     status: "Activo",
     phone: "+56 9 8765 4321",
-    lastAccess: "2024-11-24 10:30",
-    createdAt: "2024-01-15",
+    lastAccess: "2024-11-24T10:30:00Z",
+    createdAt: "2024-01-15T08:00:00Z",
+    invitationCode: undefined, // No code for Activo
+    invitationExpiresAt: undefined,
   },
   {
     id: "USR-002",
@@ -1332,8 +1489,10 @@ export const mockUsers: User[] = [
     role: "Operador",
     status: "Activo",
     phone: "+56 9 7654 3210",
-    lastAccess: "2024-11-24 09:15",
-    createdAt: "2024-02-20",
+    lastAccess: "2024-11-24T09:15:00Z",
+    createdAt: "2024-02-20T10:30:00Z",
+    invitationCode: undefined, // No code for Activo
+    invitationExpiresAt: undefined,
   },
   {
     id: "USR-003",
@@ -1341,10 +1500,12 @@ export const mockUsers: User[] = [
     lastName: "Pérez",
     email: "juan.perez@coldsync.com",
     role: "Conductor",
-    status: "Activo",
+    status: "Inactivo",
     phone: "+56 9 6543 2109",
-    lastAccess: "2024-11-23 18:45",
-    createdAt: "2024-03-10",
+    lastAccess: "2024-11-23T18:45:00Z",
+    createdAt: "2024-03-10T14:20:00Z",
+    invitationCode: "M3RT8Q5X",
+    invitationExpiresAt: "2026-01-20T23:59:59Z",
   },
   {
     id: "USR-004",
@@ -1352,10 +1513,12 @@ export const mockUsers: User[] = [
     lastName: "Martínez",
     email: "ana.martinez@coldsync.com",
     role: "Supervisor",
-    status: "Activo",
+    status: "Inactivo",
     phone: "+56 9 5432 1098",
-    lastAccess: "2024-11-24 08:00",
-    createdAt: "2024-01-25",
+    lastAccess: undefined,
+    createdAt: "2024-01-25T12:00:00Z",
+    invitationCode: "P9LK3M7N",
+    invitationExpiresAt: "2026-02-15T23:59:59Z",
   },
   {
     id: "USR-006",
@@ -1365,8 +1528,10 @@ export const mockUsers: User[] = [
     role: "Analista",
     status: "Activo",
     phone: "+56 9 3210 9876",
-    lastAccess: "2024-11-24 11:20",
-    createdAt: "2024-02-15",
+    lastAccess: "2024-11-24T11:20:00Z",
+    createdAt: "2024-02-15T16:45:00Z",
+    invitationCode: undefined, // No code for Activo
+    invitationExpiresAt: undefined,
   },
   {
     id: "USR-008",
@@ -1374,27 +1539,24 @@ export const mockUsers: User[] = [
     lastName: "Torres",
     email: "isabel.torres@coldsync.com",
     role: "Cliente",
-    status: "Activo",
+    status: "Inactivo",
     phone: "+56 9 1098 7654",
-    lastAccess: "2024-11-24 07:30",
-    createdAt: "2024-05-20",
+    lastAccess: "2024-10-15T09:30:00Z",
+    createdAt: "2024-03-05T11:15:00Z",
+    invitationCode: "R5TY9W2E",
+    invitationExpiresAt: "2024-11-30T23:59:59Z", // Expired date
   },
 ];
 
 /**
  * Role options for user dropdowns
+ * Uses enum values (OWNER, ADMIN, STAFF, DRIVER) with Spanish labels for display
  */
 export const roleOptions = [
-  { value: "Administrador", label: "Administrador" },
-  { value: "Operador", label: "Operador" },
-  { value: "Conductor", label: "Conductor" },
-  { value: "Supervisor", label: "Supervisor" },
-  { value: "Analista", label: "Analista" },
-  { value: "Cliente", label: "Cliente" },
-  { value: "Gerente de Operaciones", label: "Gerente de Operaciones" },
-  { value: "Coordinador de Logística", label: "Coordinador de Logística" },
-  { value: "Técnico de Mantenimiento", label: "Técnico de Mantenimiento" },
-  { value: "Auditor de Calidad", label: "Auditor de Calidad" },
+  { value: "OWNER", label: "Propietario" },
+  { value: "ADMIN", label: "Administrador" },
+  { value: "STAFF", label: "Personal" },
+  { value: "DRIVER", label: "Conductor" },
 ];
 
 /**
@@ -1403,6 +1565,108 @@ export const roleOptions = [
 export const userStatusOptions = [
   { value: "Activo", label: "Activo" },
   { value: "Inactivo", label: "Inactivo" },
+  { value: "Pendiente", label: "Pendiente" },
+  { value: "Expirado", label: "Expirado" },
+];
+
+/**
+ * Organization status options for dropdowns
+ * Database status: 'ACTIVE' | 'INACTIVE'
+ * According to organizations-users.md documentation
+ */
+export const organizationStatusOptions = [
+  { value: "ACTIVE", label: "Activo" },
+  { value: "INACTIVE", label: "Inactivo" },
+];
+
+/**
+ * Country options for dropdowns
+ */
+export const countryOptions = [
+  { value: 1, label: "Bolivia" },
+  { value: 2, label: "Chile" },
+  { value: 3, label: "Perú" },
+  { value: 4, label: "Argentina" },
+  { value: 5, label: "Colombia" },
+  { value: 6, label: "Ecuador" },
+];
+
+/**
+ * Mock organizations data
+ */
+export const mockOrganizations: Organization[] = [
+  {
+    id: "6aa2a43c-1234-5678-9abc-def012345678",
+    comercial_name: "Avicola Sofia",
+    legal_name: "Sofia LTDA",
+    city: "Santa Cruz",
+    base_country_id: 1, // Bolivia
+    status: "ACTIVE",
+    created_at: "2024-01-15T10:00:00Z",
+    last_access: "2024-11-24T14:30:00Z",
+    invitation_code: undefined, // No code for ACTIVE
+    invitation_expires_at: undefined,
+  },
+  {
+    id: "e853f41d-5678-9abc-def0-123456789abc",
+    comercial_name: "ColdChain Logistics",
+    legal_name: "Zentag SRL.",
+    city: "Santa Cruz de la Sierra",
+    base_country_id: 1, // Bolivia
+    status: "INACTIVE",
+    created_at: "2024-02-20T14:30:00Z",
+    last_access: undefined,
+    invitation_code: "A7K9M2X5",
+    invitation_expires_at: "2026-01-10T23:59:59Z",
+  },
+  {
+    id: "ddc67755-9abc-def0-1234-56789abcdef0",
+    comercial_name: "Fridosa",
+    legal_name: "SA",
+    city: "Santa",
+    base_country_id: 1, // Bolivia
+    status: "INACTIVE",
+    created_at: "2024-03-10T09:15:00Z",
+    last_access: undefined,
+    invitation_code: "XK9P2H4T",
+    invitation_expires_at: "2026-01-15T23:59:59Z",
+  },
+  {
+    id: "abc12345-def0-1234-5678-9abcdef01234",
+    comercial_name: "Transportes Bolivar",
+    legal_name: "Transportes Bolivar S.A.",
+    city: "La Paz",
+    base_country_id: 1, // Bolivia
+    status: "INACTIVE",
+    created_at: "2024-01-05T08:00:00Z",
+    last_access: "2024-10-15T16:20:00Z",
+    invitation_code: undefined, // No code for SUSPENDED
+    invitation_expires_at: undefined,
+  },
+  {
+    id: "def67890-1234-5678-9abc-def012345678",
+    comercial_name: "Logística Andina",
+    legal_name: "Logística Andina LTDA",
+    city: "Cochabamba",
+    base_country_id: 1, // Bolivia
+    status: "INACTIVE",
+    created_at: "2024-02-28T12:30:00Z",
+    last_access: "2024-09-20T10:45:00Z",
+    invitation_code: undefined, // No code for INACTIVE
+    invitation_expires_at: undefined,
+  },
+  {
+    id: "ghi01234-5678-9abc-def0-123456789abc",
+    comercial_name: "Frigorífico del Sur",
+    legal_name: "Frigorífico del Sur S.R.L.",
+    city: "Tarija",
+    base_country_id: 1, // Bolivia
+    status: "INACTIVE",
+    created_at: "2024-03-15T14:00:00Z",
+    last_access: "2024-08-10T09:30:00Z",
+    invitation_code: "WB4L8N3Q",
+    invitation_expires_at: "2024-12-20T23:59:59Z", // Expired date
+  },
 ];
 
 /**
@@ -1411,3 +1675,94 @@ export const userStatusOptions = [
 export function getUserById(id: string): User | undefined {
   return mockUsers.find((u) => u.id === id);
 }
+
+/**
+ * Gets an organization by ID
+ */
+export function getOrganizationById(id: string): Organization | undefined {
+  return mockOrganizations.find((o) => o.id === id);
+}
+/**
+ * Helper functions for status badges
+ */
+
+// User status badge helpers
+export const getUserStatusBadgeClass = (status: string) => {
+  switch (status) {
+    case "Activo":
+      return "bg-green-100 text-green-700 hover:bg-green-100 text-xs";
+    case "Inactivo":
+      return "bg-gray-200 text-gray-700 hover:bg-gray-200 text-xs";
+    case "Pendiente":
+      return "bg-blue-100 text-blue-700 hover:bg-blue-100 text-xs";
+    case "Expirado":
+      return "bg-red-100 text-red-700 hover:bg-red-100 text-xs";
+    default:
+      return "bg-gray-200 text-gray-700 hover:bg-gray-200 text-xs";
+  }
+};
+
+export const getUserStatusLabel = (status: string) => {
+  return status; // Ya están en español
+};
+
+// Organization status badge helpers
+export const getOrganizationStatusBadgeClass = (status: string) => {
+  switch (status) {
+    case "ACTIVE":
+      return "bg-green-100 text-green-700 hover:bg-green-100 text-xs";
+    case "INACTIVE":
+      return "bg-gray-200 text-gray-700 hover:bg-gray-200 text-xs";
+    default:
+      return "bg-gray-200 text-gray-700 hover:bg-gray-200 text-xs";
+  }
+};
+
+export const getOrganizationStatusLabel = (status: string) => {
+  switch (status) {
+    case "ACTIVE":
+      return "Activo";
+    case "INACTIVE":
+      return "Inactivo";
+    default:
+      return status;
+  }
+};
+
+/**
+ * Format date helper
+ */
+export const formatDate = (dateString?: string) => {
+  if (!dateString) return "-";
+
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  } catch {
+    return "-";
+  }
+};
+
+/**
+ * Format datetime helper
+ */
+export const formatDateTime = (dateString?: string) => {
+  if (!dateString) return "-";
+
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return "-";
+  }
+};

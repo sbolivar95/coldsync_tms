@@ -44,36 +44,52 @@ export function DropdownSelect({
   };
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          id={id}
-          disabled={disabled}
-          className={`h-9 w-full justify-between font-normal text-xs bg-input-background hover:bg-input-background ${className}`}
-        >
-          <span className={selectedOption ? "text-gray-900" : "text-gray-500"}>
-            {displayText}
-          </span>
-          <ChevronDownIcon className="w-4 h-4 text-gray-400" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)]">
-        {options.map((option) => (
-          <DropdownMenuItem
-            key={option.value}
-            onClick={() => handleSelect(option.value)}
-            className="text-xs cursor-pointer"
+    <div className="relative">
+      {/* Hidden input for form association and accessibility */}
+      <input
+        type="hidden"
+        id={id}
+        name={id}
+        value={value || ''}
+        autoComplete="off"
+      />
+      
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            disabled={disabled}
+            aria-labelledby={id ? `${id}-label` : undefined}
+            aria-expanded={open}
+            aria-haspopup="listbox"
+            role="combobox"
+            className={`h-9 w-full justify-between font-normal text-xs bg-input-background hover:bg-input-background overflow-hidden ${className}`}
           >
-            <div className="flex items-center justify-between w-full">
-              <span>{option.label}</span>
-              {value === option.value && (
-                <Check className="w-4 h-4 text-primary" />
-              )}
-            </div>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+            <span className={`truncate ${selectedOption ? "text-gray-900" : "text-gray-500"}`}>
+              {displayText}
+            </span>
+            <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0 ml-1" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-(--radix-dropdown-menu-trigger-width)">
+          {options.map((option) => (
+            <DropdownMenuItem
+              key={option.value}
+              onClick={() => handleSelect(option.value)}
+              className="text-xs cursor-pointer"
+              role="option"
+              aria-selected={value === option.value}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span>{option.label}</span>
+                {value === option.value && (
+                  <Check className="w-4 h-4 text-primary" />
+                )}
+              </div>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }

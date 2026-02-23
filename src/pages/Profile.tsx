@@ -1,236 +1,264 @@
-import { PageHeader } from "../layouts/PageHeader";
-import { useState } from "react";
-import { Input } from "../components/ui/Input";
-import { Label } from "../components/ui/Label";
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/Avatar";
-import { PrimaryButton } from "../components/widgets/PrimaryButton";
-import { SecondaryButton } from "../components/widgets/SecondaryButton";
-import { Card } from "../components/ui/Card";
-import { Camera, LogOut } from "lucide-react";
+import { PageHeader } from '../layouts/PageHeader'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Card } from '../components/ui/Card'
+import { X, Save, Check } from 'lucide-react'
+import { SecondaryButton } from '../components/widgets/SecondaryButton'
+import { PrimaryButton } from '../components/widgets/PrimaryButton'
+import {
+  profileSchema,
+  passwordSchema,
+  type ProfileFormData,
+  type PasswordFormData,
+} from '../lib/schemas/profile.schemas'
+import { useAppStore } from '../stores/useAppStore'
+import { authService } from '../services/database/auth.service'
+import { organizationMembersService } from '../services/database/organizationMembers.service'
+import { toast } from 'sonner'
+import { useShallow } from 'zustand/react/shallow'
+import { ProfileAvatarSection, ProfilePersonalInfoForm, ProfileOrganizationSection, ProfilePasswordForm, ProfileLogoutSection } from '../features/profile'
 
 export function Profile() {
-  // Estado para el perfil
-  const [perfilData, setPerfilData] = useState({
-    nombre: "Carlos",
-    apellido: "Rodríguez",
-    correo: "carlos.rodriguez@coldsync.com",
-    telefono: "+56 9 8765 4321",
-    rol: "Administrador",
-  });
+  const navigate = useNavigate()
+  const [isLoading, setIsLoading] = useState(false)
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
 
-  // Estado para datos de la empresa
-  const [empresaData, setEmpresaData] = useState({
-    nombreEmpresa: "Transportes ColdSync Chile",
-    rut: "76.123.456-7",
-    direccion: "Av. Providencia 1234, Santiago",
-    telefono: "+56 2 2345 6789",
-  });
+  // Get user, organizationMember and isPlatformUser from store
+  const { user, organizationMember, clearAuthSession, setAuthSession, isPlatformUser } =
+    useAppStore(
+      useShallow((state) => ({
+        user: state.user,
+        organizationMember: state.organizationMember,
+        clearAuthSession: state.clearAuthSession,
+        setAuthSession: state.setAuthSession,
+        isPlatformUser: state.isPlatformUser,
+      }))
+    )
 
-  // Estado para cambio de contraseña
-  const [passwordData, setPasswordData] = useState({
-    actual: "",
-    nueva: "",
-    confirmar: "",
-  });
+  // Get phone from organizationMember first, then fallback to user_metadata
+  const getPhone = () => {
+    if (organizationMember?.phone) {
+      return organizationMember.phone
+    }
+    return user?.user_metadata?.phone || ''
+  }
 
-  const handleSaveProfile = () => {
-    console.log("Guardar perfil:", perfilData, empresaData);
-  };
+  // Profile form
+  const profileForm = useForm<ProfileFormData>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      firstName: user?.user_metadata?.first_name || '',
+      lastName: user?.user_metadata?.last_name || '',
+      email: user?.email || '',
+      phone: getPhone(),
+    },
+  })
 
-  const handleChangePassword = () => {
-    console.log("Cambiar contraseña:", passwordData);
-    // Limpiar campos después de guardar
-    setPasswordData({ actual: "", nueva: "", confirmar: "" });
-  };
+  // Watch form values to detect changes
+  const watchedValues = profileForm.watch()
 
-  const handleLogout = () => {
-    console.log("Cerrar sesión");
-    // Aquí iría la lógica de logout (limpiar tokens, redirigir, etc.)
-    // Por ahora solo muestra un mensaje en consola
-    alert("Sesión cerrada exitosamente");
-  };
+  // Check if form has changes
+  const hasChanges = useMemo(() => {
+    if (!user) return false
+
+    const originalValues = {
+      firstName: user.user_metadata?.first_name || '',
+      lastName: user.user_metadata?.last_name || '',
+      email: user.email || '',
+      phone: getPhone(),
+    }
+
+    return (
+      watchedValues.firstName !== originalValues.firstName ||
+      watchedValues.lastName !== originalValues.lastName ||
+      watchedValues.email !== originalValues.email ||
+      watchedValues.phone !== originalValues.phone
+    )
+  }, [watchedValues, user, organizationMember])
+
+  // Password form
+  const passwordForm = useForm<PasswordFormData>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: {
+      new: '',
+      confirm: '',
+    },
+  })
+
+  // Update profile form when user data changes
+  useEffect(() => {
+    if (user && !isLoading) {
+      profileForm.reset({
+        firstName: user.user_metadata?.first_name || '',
+        lastName: user.user_metadata?.last_name || '',
+        email: user.email || '',
+        phone: getPhone(),
+      })
+    }
+  }, [user, organizationMember, isLoading])
+
+  const onProfileSubmit = async (data: ProfileFormData) => {
+    setIsLoading(true)
+    setJustSaved(false)
+
+    try {
+      // Update user metadata in Supabase Auth
+      await authService.updateUserMetadata({
+        first_name: data.firstName,
+        last_name: data.lastName,
+        phone: data.phone,
+      })
+
+      // Also update phone in organization_members if user has an organization
+      if (organizationMember && user?.id) {
+        const { organization } = useAppStore.getState()
+        if (organization?.id) {
+          // Update organization member phone AND name
+          await organizationMembersService.update(user.id, organization.id, {
+            first_name: data.firstName,
+            last_name: data.lastName,
+            phone: data.phone || undefined,
+          })
+        }
+      }
+
+      // Refresh user session to get updated data
+      const updatedSession = await authService.getCurrentSession()
+      if (updatedSession) {
+        setAuthSession(updatedSession)
+      }
+
+      setJustSaved(true)
+      toast.success('Perfil actualizado correctamente')
+
+      // Clear the "just saved" indicator after 3 seconds
+      setTimeout(() => setJustSaved(false), 3000)
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Error al actualizar el perfil'
+      toast.error(errorMessage)
+      console.error('Error updating profile:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const onPasswordSubmit = async (data: PasswordFormData) => {
+    setIsPasswordLoading(true)
+    try {
+      await authService.changePassword(data.new)
+      toast.success('Contraseña cambiada correctamente')
+      passwordForm.reset()
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Error al cambiar la contraseña'
+      toast.error(errorMessage)
+      console.error('Error changing password:', error)
+    } finally {
+      setIsPasswordLoading(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout()
+      clearAuthSession()
+      toast.success('Sesión cerrada correctamente')
+      navigate('/login')
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Error al cerrar sesión'
+      toast.error(errorMessage)
+      console.error('Error logging out:', error)
+    }
+  }
+
+  const profileWatch = profileForm.watch()
+  const displayName =
+    `${profileWatch.firstName || ''} ${profileWatch.lastName || ''}`.trim() ||
+    user?.email ||
+    'Usuario'
+
+  // Get role display name
+  const getRoleDisplayName = () => {
+    if (isPlatformUser) return 'Administrador de Plataforma'
+    return 'Usuario'
+  }
+
+  const displayRole = getRoleDisplayName()
 
   return (
-    <div className="flex flex-col h-full">
+    <div className='flex flex-col h-full'>
       <PageHeader />
-      
-      <div className="flex-1 p-6 bg-gray-50 overflow-auto">
-        <div className="max-w-3xl mx-auto space-y-6">
-          {/* Información Personal */}
-          <Card className="p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="relative">
-                <Avatar className="w-20 h-20">
-                  <AvatarImage src="" alt={`${perfilData.nombre} ${perfilData.apellido}`} />
-                  <AvatarFallback className="bg-[#004ef0] text-white text-xl">
-                    {perfilData.nombre[0]}{perfilData.apellido[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <button className="absolute bottom-0 right-0 bg-white rounded-full p-1.5 shadow-md border border-gray-200 hover:bg-gray-50">
-                  <Camera className="w-3.5 h-3.5 text-gray-600" />
-                </button>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900">
-                  {perfilData.nombre} {perfilData.apellido}
-                </h3>
-                <p className="text-sm text-gray-500">{perfilData.rol}</p>
-              </div>
-            </div>
 
-            <div className="space-y-4">
-              <h4 className="text-sm font-semibold text-gray-900">Mis Datos</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="nombre">Nombre</Label>
-                  <Input
-                    id="nombre"
-                    value={perfilData.nombre}
-                    onChange={(e) => setPerfilData({ ...perfilData, nombre: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="apellido">Apellido</Label>
-                  <Input
-                    id="apellido"
-                    value={perfilData.apellido}
-                    onChange={(e) => setPerfilData({ ...perfilData, apellido: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="correo">Correo</Label>
-                  <Input
-                    id="correo"
-                    type="email"
-                    value={perfilData.correo}
-                    onChange={(e) => setPerfilData({ ...perfilData, correo: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="telefono">Teléfono</Label>
-                  <Input
-                    id="telefono"
-                    value={perfilData.telefono}
-                    onChange={(e) => setPerfilData({ ...perfilData, telefono: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
+      <div className='flex-1 p-6 bg-gray-50 overflow-auto pb-24'>
+        <div className='max-w-3xl mx-auto space-y-6'>
+          {/* Personal Information */}
+          <Card className='p-6'>
+            <ProfileAvatarSection
+              displayName={displayName}
+              displayRole={displayRole}
+              firstName={profileWatch.firstName}
+              lastName={profileWatch.lastName}
+            />
+
+            <ProfilePersonalInfoForm
+              form={profileForm}
+              onSubmit={onProfileSubmit}
+            />
           </Card>
 
-          {/* Datos de la Empresa */}
-          <Card className="p-6">
-            <h4 className="text-sm font-semibold text-gray-900 mb-4">Datos de la Empresa</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="nombreEmpresa">Nombre</Label>
-                <Input
-                  id="nombreEmpresa"
-                  value={empresaData.nombreEmpresa}
-                  onChange={(e) => setEmpresaData({ ...empresaData, nombreEmpresa: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="rut">RUT</Label>
-                <Input
-                  id="rut"
-                  value={empresaData.rut}
-                  onChange={(e) => setEmpresaData({ ...empresaData, rut: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="direccion">Dirección</Label>
-                <Input
-                  id="direccion"
-                  value={empresaData.direccion}
-                  onChange={(e) => setEmpresaData({ ...empresaData, direccion: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="telefonoEmpresa">Teléfono</Label>
-                <Input
-                  id="telefonoEmpresa"
-                  value={empresaData.telefono}
-                  onChange={(e) => setEmpresaData({ ...empresaData, telefono: e.target.value })}
-                />
-              </div>
-            </div>
+          {/* Organization Information */}
+          <Card className='p-6'>
+            <ProfileOrganizationSection />
           </Card>
 
-          {/* Cambiar Contraseña */}
-          <Card className="p-6">
-            <h4 className="text-sm font-semibold text-gray-900 mb-4">Cambiar Contraseña</h4>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="actual">Contraseña Actual</Label>
-                <Input
-                  id="actual"
-                  type="password"
-                  value={passwordData.actual}
-                  onChange={(e) => setPasswordData({ ...passwordData, actual: e.target.value })}
-                  placeholder="••••••••"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="nueva">Nueva Contraseña</Label>
-                  <Input
-                    id="nueva"
-                    type="password"
-                    value={passwordData.nueva}
-                    onChange={(e) => setPasswordData({ ...passwordData, nueva: e.target.value })}
-                    placeholder="••••••••"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmar">Confirmar Contraseña</Label>
-                  <Input
-                    id="confirmar"
-                    type="password"
-                    value={passwordData.confirmar}
-                    onChange={(e) => setPasswordData({ ...passwordData, confirmar: e.target.value })}
-                    placeholder="••••••••"
-                  />
-                </div>
-              </div>
-              <div className="pt-2">
-                <SecondaryButton 
-                  onClick={handleChangePassword}
-                  disabled={!passwordData.actual || !passwordData.nueva || !passwordData.confirmar}
-                >
-                  Actualizar Contraseña
-                </SecondaryButton>
-              </div>
-            </div>
+          {/* Change Password */}
+          <Card className='p-6'>
+            <ProfilePasswordForm
+              form={passwordForm}
+              onSubmit={onPasswordSubmit}
+              isLoading={isPasswordLoading}
+            />
           </Card>
 
-          {/* Cerrar Sesión */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900">Sesión</h4>
-                <p className="text-xs text-gray-500 mt-1">
-                  Cierra tu sesión de forma segura
-                </p>
-              </div>
-              <SecondaryButton onClick={handleLogout} className="flex items-center gap-2">
-                <LogOut className="w-4 h-4" />
-                Cerrar Sesión
-              </SecondaryButton>
-            </div>
+          {/* Logout */}
+          <Card className='p-6'>
+            <ProfileLogoutSection onLogout={handleLogout} />
           </Card>
+        </div>
+      </div>
 
-          {/* Botones de Acción */}
-          <div className="flex justify-end gap-3">
-            <SecondaryButton>
-              Cancelar
-            </SecondaryButton>
-            <PrimaryButton onClick={handleSaveProfile}>
-              Guardar Cambios
-            </PrimaryButton>
-          </div>
+      {/* Fixed Footer with Action Buttons */}
+      <div className='border-t border-gray-200 bg-white px-6 py-4 shrink-0'>
+        <div className='max-w-3xl mx-auto flex justify-end gap-3'>
+          <SecondaryButton
+            icon={X}
+            onClick={() => {
+              profileForm.reset()
+              setJustSaved(false)
+            }}
+            disabled={!hasChanges}
+          >
+            Cancelar
+          </SecondaryButton>
+          <PrimaryButton
+            icon={justSaved ? Check : Save}
+            disabled={isLoading || !hasChanges}
+            onClick={() => {
+              profileForm.handleSubmit(onProfileSubmit)()
+            }}
+            className={justSaved ? 'bg-green-600 hover:bg-green-700' : ''}
+          >
+            {isLoading ? 'Guardando...' : justSaved ? 'Guardado' : 'Guardar'}
+          </PrimaryButton>
         </div>
       </div>
     </div>
-  );
+  )
 }

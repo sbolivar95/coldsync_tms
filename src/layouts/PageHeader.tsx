@@ -6,6 +6,7 @@ interface PageHeaderProps {
   tabs?: { id: string; label: string; active: boolean; onClick: () => void; badge?: number }[];
   showSearch?: boolean;
   searchPlaceholder?: string;
+  searchValue?: string;
   onSearch?: (value: string) => void;
   filters?: ReactNode;
   actions?: ReactNode;
@@ -15,6 +16,7 @@ export function PageHeader({
   tabs,
   showSearch,
   searchPlaceholder = "Search",
+  searchValue,
   onSearch,
   filters,
   actions,
@@ -29,20 +31,17 @@ export function PageHeader({
               <button
                 key={tab.id}
                 onClick={tab.onClick}
-                className={`pb-3 pt-3 border-b-2 transition-colors text-sm flex items-center ${
-                  tab.active
-                    ? "text-gray-900"
-                    : "border-transparent text-gray-600 hover:text-gray-900"
-                }`}
-                style={tab.active ? { borderBottomColor: '#004ef0' } : {}}
+                className={`pb-3 pt-3 border-b-2 transition-colors text-sm flex items-center ${tab.active
+                  ? "text-gray-900 border-primary"
+                  : "border-transparent text-gray-600 hover:text-gray-900"
+                  }`}
               >
                 {tab.label}
                 {tab.badge !== undefined && (
-                  <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
-                    tab.active 
-                      ? "bg-[#004ef0] text-white" 
-                      : "bg-gray-200 text-gray-700"
-                  }`}>
+                  <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs ${tab.active
+                    ? "bg-primary text-white"
+                    : "bg-gray-200 text-gray-700"
+                    }`}>
                     {tab.badge}
                   </span>
                 )}
@@ -63,11 +62,12 @@ export function PageHeader({
                 <Input
                   placeholder={searchPlaceholder}
                   className="pl-10 h-9"
+                  value={searchValue}
                   onChange={(e) => onSearch?.(e.target.value)}
                 />
               </div>
             )}
-            
+
             {/* Filtros personalizados */}
             {filters}
           </div>

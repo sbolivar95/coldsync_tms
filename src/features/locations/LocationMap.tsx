@@ -1,451 +1,385 @@
-import { useEffect, useMemo, useRef } from 'react'
-import maplibregl, { Map } from 'maplibre-gl'
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import {
+  Map,
+  useMap,
+  MapMouseEvent,
+} from "@vis.gl/react-google-maps";
+import { MapSideControls, MapDrawingToolbar } from "../../components/widgets/MapControls";
+import { useMapHistory } from "./hooks/useMapHistory";
 
-type LatLng = { lat: number; lng: number }
 
+// Define internal types to avoid deep dependency on google global during definition if possible
+type LatLngLiteral = { lat: number; lng: number };
+
+// --- CIRCLE COMPONENT (Interactive) ---
+interface CircleProps {
+  center: LatLngLiteral;
+  radius: number;
+  onCenterChanged?: (center: LatLngLiteral) => void;
+  onRadiusChanged?: (radius: number) => void;
+  // Options
+  fillColor?: string;
+  fillOpacity?: number;
+  strokeColor?: string;
+  strokeWeight?: number;
+  clickable?: boolean;
+  editable?: boolean;
+  draggable?: boolean;
+}
+
+function Circle(props: CircleProps) {
+  const { onCenterChanged, onRadiusChanged, center, radius, ...options } = props;
+  const map = useMap();
+  const circleRef = useRef<google.maps.Circle | null>(null);
+
+  useEffect(() => {
+    if (!map || !window.google) return;
+
+    const circle = new google.maps.Circle({
+      ...options,
+      map,
+      center,
+      radius,
+    });
+    circleRef.current = circle;
+
+    // Listeners for interactivity
+    const centerListener = circle.addListener("center_changed", () => {
+      const newCenter = circle.getCenter();
+      if (newCenter && onCenterChanged) {
+        onCenterChanged(newCenter.toJSON());
+      }
+    });
+
+    const radiusListener = circle.addListener("radius_changed", () => {
+      const newRadius = circle.getRadius();
+      if (onRadiusChanged) {
+        onRadiusChanged(newRadius);
+      }
+    });
+
+    return () => {
+      if (centerListener) google.maps.event.removeListener(centerListener);
+      if (radiusListener) google.maps.event.removeListener(radiusListener);
+      circle.setMap(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]);
+
+  // Sync props to internal object if changed from outside (form)
+  useEffect(() => {
+    if (!circleRef.current) return;
+    const currentCenter = circleRef.current.getCenter()?.toJSON();
+    if (currentCenter && (currentCenter.lat !== center.lat || currentCenter.lng !== center.lng)) {
+      circleRef.current.setCenter(center);
+    }
+    if (circleRef.current.getRadius() !== radius) {
+      circleRef.current.setRadius(radius);
+    }
+  }, [center, radius]);
+
+  return null;
+}
+
+// --- POLYGON COMPONENT (Interactive) ---
+interface PolygonProps {
+  paths: LatLngLiteral[];
+  onPathsChanged?: (paths: LatLngLiteral[]) => void;
+  // Options
+  fillColor?: string;
+  fillOpacity?: number;
+  strokeColor?: string;
+  strokeWeight?: number;
+  clickable?: boolean;
+  editable?: boolean;
+  draggable?: boolean;
+}
+
+function Polygon(props: PolygonProps) {
+  const { paths, onPathsChanged, ...options } = props;
+  const map = useMap();
+  const polygonRef = useRef<google.maps.Polygon | null>(null);
+
+  useEffect(() => {
+    if (!map || !window.google) return;
+
+    const polygon = new google.maps.Polygon({
+      ...options,
+      map,
+      paths,
+    });
+    polygonRef.current = polygon;
+
+    const updatePaths = () => {
+      if (onPathsChanged && polygonRef.current) {
+        const newPaths = polygonRef.current.getPath().getArray().map(p => p.toJSON());
+        onPathsChanged(newPaths);
+      }
+    };
+
+    const path = polygon.getPath();
+    const listeners = [
+      path.addListener("set_at", updatePaths),
+      path.addListener("insert_at", updatePaths),
+      path.addListener("remove_at", updatePaths),
+    ];
+
+    return () => {
+      listeners.forEach(l => {
+        if (l) google.maps.event.removeListener(l);
+      });
+      polygon.setMap(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]);
+
+  // External sync
+  useEffect(() => {
+    if (!polygonRef.current) return;
+    const currentPaths = polygonRef.current.getPath().getArray().map(p => p.toJSON());
+    // Basic comparison to avoid feedback loop
+    if (currentPaths.length !== paths.length || JSON.stringify(currentPaths) !== JSON.stringify(paths)) {
+      polygonRef.current.setPaths(paths);
+    }
+  }, [paths]);
+
+  return null;
+}
+
+// --- MAIN MAP COMPONENT ---
 interface LocationMapProps {
-  locationType: 'point' | 'polygon'
-  coordinates?: LatLng | null
-  polygon?: LatLng[] | null
-
-  /** Circle radius in meters (used in point mode) */
-  radiusMeters?: number
-
+  locationType: "point" | "polygon";
+  coordinates?: LatLngLiteral | null;
+  polygon?: LatLngLiteral[] | null;
   onLocationChange: (
-    type: 'point' | 'polygon',
-    data: LatLng | LatLng[] | null
-  ) => void
-}
-
-const MAP_STYLE: any = {
-  version: 8,
-  sources: {
-    osm: {
-      type: 'raster',
-      tiles: [
-        'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      ],
-      tileSize: 256,
-      attribution: '© OpenStreetMap contributors',
-    },
-  },
-  layers: [
-    {
-      id: 'osm',
-      type: 'raster',
-      source: 'osm',
-    },
-  ],
-} // free demo style (good for dev)
-const DEFAULT_CENTER: LatLng = { lat: -16.4897, lng: -68.1193 } // La Paz
-
-function toGeoJSONPoint(p: LatLng | null) {
-  return {
-    type: 'Feature' as const,
-    geometry: p
-      ? {
-          type: 'Point' as const,
-          coordinates: [p.lng, p.lat] as [number, number],
-        }
-      : { type: 'Point' as const, coordinates: [0, 0] as [number, number] },
-    properties: {},
-  }
-}
-
-function polygonToGeoJSON(poly: LatLng[] | null) {
-  const pts = (poly || []).filter(Boolean)
-  const coords: [number, number][] = pts.map((p) => [p.lng, p.lat])
-
-  // close ring if needed
-  if (coords.length >= 3) {
-    const first = coords[0]
-    const last = coords[coords.length - 1]
-    if (first[0] !== last[0] || first[1] !== last[1]) coords.push(first)
-  }
-
-  return {
-    type: 'Feature' as const,
-    geometry: {
-      type: 'Polygon' as const,
-      coordinates: coords.length >= 4 ? [coords] : [[]],
-    },
-    properties: {},
-  }
-}
-
-// Generate a circle polygon (approx) around center with radius in meters
-function circleToPolygon(
-  center: LatLng,
-  radiusMeters: number,
-  steps = 64
-): LatLng[] {
-  const R = 6371000 // Earth radius meters
-  const lat1 = (center.lat * Math.PI) / 180
-  const lon1 = (center.lng * Math.PI) / 180
-  const d = radiusMeters / R
-
-  const points: LatLng[] = []
-
-  for (let i = 0; i <= steps; i++) {
-    const brng = (2 * Math.PI * i) / steps
-
-    const lat2 = Math.asin(
-      Math.sin(lat1) * Math.cos(d) +
-        Math.cos(lat1) * Math.sin(d) * Math.cos(brng)
-    )
-
-    const lon2 =
-      lon1 +
-      Math.atan2(
-        Math.sin(brng) * Math.sin(d) * Math.cos(lat1),
-        Math.cos(d) - Math.sin(lat1) * Math.sin(lat2)
-      )
-
-    points.push({
-      lat: (lat2 * 180) / Math.PI,
-      lng: (((lon2 * 180) / Math.PI + 540) % 360) - 180, // normalize to [-180, 180]
-    })
-  }
-
-  return points
+    type: "point" | "polygon" | "radius",
+    data: LatLngLiteral | LatLngLiteral[] | number | null
+  ) => void;
+  radius?: number;
+  readOnly?: boolean;
+  showDrawingToolbar?: boolean;
+  onTypeChange?: (type: "point" | "polygon") => void;
 }
 
 export function LocationMap({
-  locationType,
+  locationType: initialLocationType,
   coordinates,
   polygon,
-  radiusMeters = 100,
   onLocationChange,
+  onTypeChange,
+  radius = 100,
+  readOnly = false,
+  showDrawingToolbar = false,
 }: LocationMapProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const mapRef = useRef<Map | null>(null)
+  const [isMapLoading, setIsMapLoading] = useState(true);
 
-  const pointMarkerRef = useRef<maplibregl.Marker | null>(null)
-  const vertexMarkersRef = useRef<maplibregl.Marker[]>([])
-
-  const polygonDraftRef = useRef<LatLng[]>(polygon || [])
-
-  const center = useMemo<LatLng>(() => {
-    if (locationType === 'point' && coordinates) return coordinates
-    if (
-      locationType === 'polygon' &&
-      (polygon?.length || polygonDraftRef.current.length)
-    ) {
-      const pts = (
-        polygon && polygon.length ? polygon : polygonDraftRef.current
-      ) as LatLng[]
-      return pts[0] || DEFAULT_CENTER
+  // Calcular centro inicial basado en props o usar un valor regional por defecto (América)
+  const initialCenter = useMemo(() => {
+    if (coordinates && (coordinates.lat !== 0 || coordinates.lng !== 0)) return coordinates;
+    if (polygon && polygon.length > 0) {
+      const lat = polygon.reduce((s, p) => s + p.lat, 0) / polygon.length;
+      const lng = polygon.reduce((s, p) => s + p.lng, 0) / polygon.length;
+      return { lat, lng };
     }
-    return DEFAULT_CENTER
-  }, [locationType, coordinates, polygon])
+    return null;
+  }, [coordinates, polygon]);
 
-  // Init map once
+  // Si no hay datos, inicializar en una vista de América (evita el 0,0 en el mar)
+  const defaultCenter = { lat: -17.3895, lng: -66.1568 }; // Cochabamba, Bolivia
+  const [center, setCenter] = useState<LatLngLiteral>(initialCenter || defaultCenter);
+  const [zoom, setZoom] = useState(initialCenter ? 16 : 3);
+
+  const [mapTypeId, setMapTypeId] = useState<string>("roadmap");
+  const [drawingMode, setDrawingMode] = useState<"point" | "polygon" | "none">("none");
+  const map = useMap();
+
+  // Determinar si hay una geocerca válida existente (para decidir si auto-ajustar mapa)
+  const isEditingValidData = useMemo(() => !!initialCenter, [initialCenter]);
+  const showGrayOverlay = isMapLoading && isEditingValidData;
+
+  // Ref para asegurar que fitBounds solo ocurra una vez al cargar
+  const hasFittedRef = useRef<boolean>(false);
+
+  // Usar el tipo de localización dinámico si la toolbar está activa, si no usar el prop
+  const activeLocationType = showDrawingToolbar ? (drawingMode === "none" ? initialLocationType : drawingMode) : initialLocationType;
+
+  // --- LÓGICA DE HISTORIAL (HOOK CUSTOM) ---
+  const {
+    canUndo,
+    canRedo,
+    pushToHistory,
+    handleUndo: undo,
+    handleRedo: redo,
+    resetHistory
+  } = useMapHistory(onLocationChange);
+
+  const handleUndo = useCallback(() => undo(activeLocationType, activeLocationType === "point" ? coordinates : polygon), [undo, activeLocationType, coordinates, polygon]);
+  const handleRedo = useCallback(() => redo(activeLocationType, activeLocationType === "point" ? coordinates : polygon), [redo, activeLocationType, coordinates, polygon]);
+
+  const handleClear = useCallback(() => {
+    pushToHistory(activeLocationType, activeLocationType === "point" ? coordinates : polygon);
+    onLocationChange(activeLocationType, null);
+  }, [activeLocationType, pushToHistory, onLocationChange, coordinates, polygon]);
+
+  // Sincronizar el tipo de localización inicial con el modo de dibujo si la toolbar está activa
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return
-
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: MAP_STYLE,
-      center: [center.lng, center.lat],
-      zoom: 13,
-    })
-
-    map.addControl(
-      new maplibregl.NavigationControl({ visualizePitch: true }),
-      'top-left'
-    )
-
-    map.on('load', () => {
-      // sources
-      if (!map.getSource('geofence-point')) {
-        map.addSource('geofence-point', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: [toGeoJSONPoint(null)] },
-        })
-      }
-
-      if (!map.getSource('geofence-circle')) {
-        map.addSource('geofence-circle', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: [polygonToGeoJSON(null)],
-          },
-        })
-      }
-
-      if (!map.getSource('geofence-polygon')) {
-        map.addSource('geofence-polygon', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: [polygonToGeoJSON(null)],
-          },
-        })
-      }
-
-      // layers (circle)
-      if (!map.getLayer('circle-fill')) {
-        map.addLayer({
-          id: 'circle-fill',
-          type: 'fill',
-          source: 'geofence-circle',
-          paint: {
-            'fill-opacity': 0.12,
-          },
-        })
-      }
-      if (!map.getLayer('circle-line')) {
-        map.addLayer({
-          id: 'circle-line',
-          type: 'line',
-          source: 'geofence-circle',
-          paint: {
-            'line-opacity': 0.7,
-            'line-width': 2,
-          },
-        })
-      }
-
-      // layers (polygon)
-      if (!map.getLayer('poly-fill')) {
-        map.addLayer({
-          id: 'poly-fill',
-          type: 'fill',
-          source: 'geofence-polygon',
-          paint: {
-            'fill-opacity': 0.12,
-          },
-        })
-      }
-      if (!map.getLayer('poly-line')) {
-        map.addLayer({
-          id: 'poly-line',
-          type: 'line',
-          source: 'geofence-polygon',
-          paint: {
-            'line-opacity': 0.8,
-            'line-width': 2,
-          },
-        })
-      }
-
-      // (optional) render a tiny point dot via layer (marker still used for dragging)
-      if (!map.getLayer('point-dot')) {
-        map.addLayer({
-          id: 'point-dot',
-          type: 'circle',
-          source: 'geofence-point',
-          paint: {
-            'circle-radius': 5,
-            'circle-opacity': 0.9,
-          },
-        })
-      }
-    })
-
-    // click behavior
-    const onClick = (e: maplibregl.MapMouseEvent & maplibregl.EventData) => {
-      const latlng = { lat: e.lngLat.lat, lng: e.lngLat.lng }
-
-      if (locationType === 'point') {
-        onLocationChange('point', latlng)
-        return
-      }
-
-      // polygon: add vertex
-      const next = [...polygonDraftRef.current, latlng]
-      polygonDraftRef.current = next
-      onLocationChange('polygon', next)
+    if (showDrawingToolbar) {
+      setDrawingMode(initialLocationType === "point" ? "point" : "polygon");
     }
+  }, [initialLocationType, showDrawingToolbar]);
 
-    map.on('click', onClick)
-
-    mapRef.current = map
-
-    return () => {
-      map.off('click', onClick)
-      map.remove()
-      mapRef.current = null
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Keep draft synced with prop polygon (e.g. switching records)
+  // Si cambia el tipo desde afuera (Cancel/Reset), reseteamos el historial local
   useEffect(() => {
-    polygonDraftRef.current = polygon ? [...polygon] : []
-  }, [polygon])
+    resetHistory();
+  }, [initialLocationType, resetHistory]);
 
-  // Update map center gently (when incoming data changes)
+  // Función para alternar entre mapa y satélite
+  const toggleMapType = () => {
+    setMapTypeId(prev => prev === "roadmap" ? "hybrid" : "roadmap");
+  };
+
+  // Ref para rastrear qué geocerca ya fue "ajustada" en el mapa
+
+  // Opciones de estilo para la geocerca
+  const shapeOptions = useMemo(() => ({
+    fillColor: "#004ef0",
+    fillOpacity: 0.15,
+    strokeColor: "#004ef0",
+    strokeWeight: 2,
+    clickable: !readOnly,
+    editable: !readOnly,
+    draggable: !readOnly,
+  }), [readOnly]);
+
+  // Ajustar automáticamente el mapa SOLO cuando se cargan datos existentes por primera vez
   useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
+    if (!map || !window.google || !isEditingValidData || hasFittedRef.current) return;
 
-    // Don’t constantly fly; only recenter when we have meaningful geometry
-    if (locationType === 'point' && coordinates) {
-      map.easeTo({ center: [coordinates.lng, coordinates.lat], duration: 300 })
+    if (activeLocationType === "point" && coordinates) {
+      const radiusInDegrees = (radius || 100) / 111000;
+      const bounds = new google.maps.LatLngBounds(
+        { lat: coordinates.lat - radiusInDegrees, lng: coordinates.lng - radiusInDegrees },
+        { lat: coordinates.lat + radiusInDegrees, lng: coordinates.lng + radiusInDegrees }
+      );
+      map.fitBounds(bounds, 50);
+      hasFittedRef.current = true;
+    } else if (activeLocationType === "polygon" && polygon && polygon.length > 0) {
+      const bounds = new google.maps.LatLngBounds();
+      polygon.forEach(point => bounds.extend(point));
+      map.fitBounds(bounds, 50);
+      hasFittedRef.current = true;
     }
-    if (locationType === 'polygon' && polygon && polygon.length >= 2) {
-      map.easeTo({ center: [polygon[0].lng, polygon[0].lat], duration: 300 })
-    }
-  }, [locationType, coordinates, polygon])
+  }, [map, activeLocationType, isEditingValidData, coordinates, polygon, radius]);
 
-  // Update geojson sources (point/circle/polygon)
+  // Si el tipo cambia (punto <-> polígono), permitimos un re-ajuste único
   useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
+    hasFittedRef.current = false;
+  }, [activeLocationType]);
 
-    const pointSource = map.getSource('geofence-point') as
-      | maplibregl.GeoJSONSource
-      | undefined
-    const circleSource = map.getSource('geofence-circle') as
-      | maplibregl.GeoJSONSource
-      | undefined
-    const polySource = map.getSource('geofence-polygon') as
-      | maplibregl.GeoJSONSource
-      | undefined
 
-    if (!pointSource || !circleSource || !polySource) return
 
-    // Point source
-    pointSource.setData({
-      type: 'FeatureCollection',
-      features: [toGeoJSONPoint(coordinates || null)],
-    })
+  const handleMapClick = useCallback((ev: MapMouseEvent) => {
+    if (readOnly || !ev.detail.latLng) return;
+    const { lat, lng } = ev.detail.latLng;
 
-    // Circle source (only when in point mode + has center)
-    if (locationType === 'point' && coordinates) {
-      const circlePoly = circleToPolygon(coordinates, radiusMeters)
-      circleSource.setData({
-        type: 'FeatureCollection',
-        features: [polygonToGeoJSON(circlePoly)],
-      })
-    } else {
-      circleSource.setData({
-        type: 'FeatureCollection',
-        features: [polygonToGeoJSON(null)],
-      })
+    if (activeLocationType === "point") {
+      pushToHistory(activeLocationType, coordinates);
+      onLocationChange("point", { lat, lng });
+    } else if (activeLocationType === "polygon") {
+      const current = polygon || [];
+      pushToHistory(activeLocationType, polygon);
+      onLocationChange("polygon", [...current, { lat, lng }]);
     }
+  }, [readOnly, activeLocationType, polygon, coordinates, onLocationChange, pushToHistory]);
 
-    // Polygon source (only when in polygon mode)
-    const polyPts = locationType === 'polygon' ? polygonDraftRef.current : []
-    polySource.setData({
-      type: 'FeatureCollection',
-      features: [polygonToGeoJSON(polyPts.length ? polyPts : null)],
-    })
-  }, [locationType, coordinates, radiusMeters, polygon])
 
-  // Marker handling (draggable point marker & polygon vertex markers)
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-
-    // Clear all vertex markers
-    vertexMarkersRef.current.forEach((m) => m.remove())
-    vertexMarkersRef.current = []
-
-    // Point mode: draggable marker for center
-    if (locationType === 'point') {
-      if (coordinates) {
-        if (!pointMarkerRef.current) {
-          pointMarkerRef.current = new maplibregl.Marker({ draggable: true })
-            .setLngLat([coordinates.lng, coordinates.lat])
-            .addTo(map)
-
-          pointMarkerRef.current.on('dragend', () => {
-            const ll = pointMarkerRef.current?.getLngLat()
-            if (!ll) return
-            onLocationChange('point', { lat: ll.lat, lng: ll.lng })
-          })
-        } else {
-          pointMarkerRef.current.setLngLat([coordinates.lng, coordinates.lat])
-        }
-      } else {
-        if (pointMarkerRef.current) {
-          pointMarkerRef.current.remove()
-          pointMarkerRef.current = null
-        }
-      }
-      return
+  // Función para centrar el mapa en la geocerca actual
+  const handleCenterMap = () => {
+    if (!map) return;
+    if (activeLocationType === "point" && coordinates) {
+      map.panTo(coordinates);
+      map.setZoom(16);
+    } else if (activeLocationType === "polygon" && polygon && polygon.length > 0) {
+      const bounds = new google.maps.LatLngBounds();
+      polygon.forEach(p => bounds.extend(p));
+      map.fitBounds(bounds, 50);
     }
+  };
 
-    // Polygon mode: remove point marker
-    if (pointMarkerRef.current) {
-      pointMarkerRef.current.remove()
-      pointMarkerRef.current = null
-    }
-
-    // Create draggable markers for each vertex
-    const pts = polygonDraftRef.current
-    pts.forEach((p, idx) => {
-      const marker = new maplibregl.Marker({ draggable: true })
-        .setLngLat([p.lng, p.lat])
-        .addTo(map)
-
-      marker.on('dragend', () => {
-        const ll = marker.getLngLat()
-        const next = [...polygonDraftRef.current]
-        next[idx] = { lat: ll.lat, lng: ll.lng }
-        polygonDraftRef.current = next
-        onLocationChange('polygon', next)
-      })
-
-      vertexMarkersRef.current.push(marker)
-    })
-  }, [locationType, coordinates, polygon, onLocationChange])
-
-  const undoLast = () => {
-    if (locationType !== 'polygon') return
-    const next = polygonDraftRef.current.slice(0, -1)
-    polygonDraftRef.current = next
-    onLocationChange('polygon', next.length ? next : null)
-  }
-
-  const clearAll = () => {
-    if (locationType === 'point') {
-      onLocationChange('point', null)
-      return
-    }
-    polygonDraftRef.current = []
-    onLocationChange('polygon', null)
-  }
+  const hasDataToClear = activeLocationType === "point"
+    ? (coordinates && (coordinates.lat !== 0 || coordinates.lng !== 0))
+    : (polygon && polygon.length > 0);
 
   return (
-    <div
-      className='relative border border-gray-300 rounded-md overflow-hidden bg-gray-50'
-      style={{ height: 300 }}
-    >
-      <div
-        ref={containerRef}
-        className='w-full h-full'
-      />
+    <div className="border border-gray-300 rounded-md overflow-hidden relative shadow-sm group bg-gray-100" style={{ height: "450px" }}>
+      {/* Fondo gris de espera - Solo si estamos esperando datos de edición (Regla 58) */}
+      {showGrayOverlay && (
+        <div className="absolute inset-0 z-20 bg-gray-100 transition-all duration-300" />
+      )}
 
-      <div className='absolute bottom-2 left-2 bg-white/90 backdrop-blur px-2 py-1 rounded text-xs text-gray-700 shadow'>
-        {locationType === 'point'
-          ? 'Click para definir el centro del círculo (puedes arrastrar el pin)'
-          : 'Click para agregar puntos (arrastra vértices para ajustar)'}
-      </div>
+      {/* El mapa siempre se rinde, el overlay lo tapa solo si es necesario */}
+      <Map
+        center={center}
+        zoom={zoom}
+        mapTypeId={mapTypeId}
+        onCenterChanged={ev => setCenter(ev.detail.center)}
+        onZoomChanged={ev => setZoom(ev.detail.zoom)}
+        onClick={readOnly ? undefined : handleMapClick}
+        onIdle={() => setIsMapLoading(false)}
+        disableDefaultUI={true}
+        gestureHandling={readOnly ? "cooperative" : "greedy"}
+        draggableCursor={readOnly ? undefined : (activeLocationType === "polygon" ? "crosshair" : undefined)}
+      >
+        <MapSideControls
+          onToggleMapType={toggleMapType}
+          onCenterMap={handleCenterMap}
+          mapTypeId={mapTypeId}
+        />
 
-      <div className='absolute top-2 right-2 flex gap-2'>
-        {locationType === 'polygon' && (
-          <button
-            type='button'
-            onClick={undoLast}
-            className='px-2 py-1 bg-white rounded text-xs shadow border border-gray-200 hover:bg-gray-50'
-          >
-            Deshacer
-          </button>
+        {showDrawingToolbar && (
+          <MapDrawingToolbar
+            selectedMode={activeLocationType}
+            onModeChange={(mode) => {
+              if (mode !== "none" && onTypeChange) {
+                onTypeChange(mode as "point" | "polygon");
+              }
+            }}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onClear={handleClear}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            canClear={!!hasDataToClear}
+          />
         )}
-        <button
-          type='button'
-          onClick={clearAll}
-          className='px-2 py-1 bg-white rounded text-xs shadow border border-gray-200 hover:bg-gray-50'
-        >
-          Limpiar
-        </button>
+
+        {activeLocationType === "point" && coordinates && (
+          <Circle
+            center={coordinates}
+            radius={radius || 100}
+            {...shapeOptions}
+            onCenterChanged={newCenter => onLocationChange("point", newCenter)}
+            onRadiusChanged={newRadius => onLocationChange("radius", newRadius)}
+          />
+        )}
+
+        {activeLocationType === "polygon" && polygon && polygon.length > 0 && (
+          <Polygon
+            paths={polygon}
+            {...shapeOptions}
+            onPathsChanged={newPaths => onLocationChange("polygon", newPaths)}
+          />
+        )}
+      </Map>
+
+      {/* Tooltip de ayuda contextual */}
+      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+        <div className="bg-black/80 backdrop-blur-sm text-white px-3 py-1 rounded-full text-[10px] font-light tracking-wide shadow-2xl border border-white/10 uppercase">
+          {activeLocationType === "point"
+            ? "Haz click para situar • Arrastra para mover"
+            : "Haz click para puntos • Arrastra nodos para editar"}
+        </div>
       </div>
     </div>
-  )
+  );
 }

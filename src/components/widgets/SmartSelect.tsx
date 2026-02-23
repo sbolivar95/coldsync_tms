@@ -1,18 +1,22 @@
-import { useState, useMemo } from "react";
-import { Search, X } from "lucide-react";
+import { useState, useMemo, forwardRef } from "react";
+import { Search } from "lucide-react";
 import { Label } from "../ui/Label";
-import { Checkbox } from "../ui/Checkbox";
-import { Badge } from "../ui/Badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/Select";
+import { Input } from "../ui/Input";
 
 /**
- * SMART SELECT COMPONENT - ColdSync
+ * SMART SELECT COMPONENT - ColdSync (Shadcn/Radix UI Based)
  * 
- * Componente reutilizable para diferentes tipos de selección:
+ * Componente de selección basado en shadcn/ui Select (Radix UI)
+ * Soluciona todos los problemas de posicionamiento, scroll y viewport
  * 
- * Modos disponibles:
- * - 'single': Selección simple con búsqueda
- * - 'multi': Selección múltiple con checkboxes
- * - 'smart': Selección inteligente con filtros, scores y metadata
+ * Cumple con FormControl (Slot): acepta y reenvía id, aria-* al SelectTrigger
  */
 
 // ==================== TIPOS ====================
@@ -23,22 +27,14 @@ export interface BaseOption {
 }
 
 export interface SmartOption extends BaseOption {
-  // Metadata adicional para modo 'smart'
   subtitle?: string;
-  score?: number;
-  utilization?: number;
-  tags?: string[];
-  metadata?: { label: string; value: string }[];
   secondaryId?: string;
 }
 
-type SelectMode = 'single' | 'multi' | 'smart';
-
-interface SmartSelectProps {
+interface SmartSelectProps extends Omit<React.ComponentPropsWithoutRef<"div">, "onChange"> {
   // Configuración básica
   label?: string;
-  id?: string;
-  mode?: SelectMode;
+  name?: string;
   placeholder?: string;
   required?: boolean;
   helpText?: string;
@@ -48,373 +44,141 @@ interface SmartSelectProps {
   // Opciones
   options: SmartOption[];
 
-  // Valores
-  value?: string | string[];
-  onChange?: (value: string | string[]) => void;
+  // Valor
+  value?: string;
+  onChange?: (value: string) => void;
 
-  // Configuración de búsqueda
+  // Búsqueda
   searchable?: boolean;
   searchPlaceholder?: string;
-
-  // Tabs de filtrado (solo para modo 'smart')
-  filters?: { id: string; label: string }[];
-  activeFilter?: string;
-  onFilterChange?: (filterId: string) => void;
-
-  // Renderizado personalizado
-  renderOption?: (option: SmartOption) => React.ReactNode;
-
-  // Altura máxima del dropdown
-  maxHeight?: string;
 }
 
-// ==================== COMPONENTE PRINCIPAL ====================
+export const SmartSelect = forwardRef<HTMLDivElement, SmartSelectProps>(
+  function SmartSelect(
+    {
+      label,
+      id,
+      name,
+      placeholder = "Seleccionar...",
+      required = false,
+      helpText,
+      error,
+      disabled = false,
+      options,
+      value,
+      onChange,
+      searchable = true,
+      searchPlaceholder = "Buscar...",
+      // Capture aria-* and other props forwarded by FormControl's Slot
+      ...rest
+    },
+    ref,
+  ) {
+    const [searchQuery, setSearchQuery] = useState("");
 
-export function SmartSelect({
-  label,
-  id,
-  mode = 'single',
-  placeholder = 'Seleccionar...',
-  required = false,
-  helpText,
-  error,
-  disabled = false,
-  options,
-  value,
-  onChange,
-  searchable = true,
-  searchPlaceholder = 'Buscar...',
-  filters,
-  activeFilter,
-  onFilterChange,
-  renderOption,
-  maxHeight = '320px',
-}: SmartSelectProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedValues, setSelectedValues] = useState<string[]>(
-    Array.isArray(value) ? value : value ? [value] : []
-  );
+    // Filtrado de opciones
+    const filteredOptions = useMemo(() => {
+      if (!searchQuery) return options;
 
-  // Filtrado de opciones
-  const filteredOptions = useMemo(() => {
-    if (!searchQuery) return options;
+      const query = searchQuery.toLowerCase();
+      return options.filter(
+        (option) =>
+          option.label.toLowerCase().includes(query) ||
+          option.subtitle?.toLowerCase().includes(query) ||
+          option.secondaryId?.toLowerCase().includes(query)
+      );
+    }, [options, searchQuery]);
 
-    const query = searchQuery.toLowerCase();
-    return options.filter(
-      (option) =>
-        option.label.toLowerCase().includes(query) ||
-        option.subtitle?.toLowerCase().includes(query) ||
-        option.secondaryId?.toLowerCase().includes(query) ||
-        option.tags?.some((tag) => tag.toLowerCase().includes(query))
-    );
-  }, [options, searchQuery]);
-
-  // Manejo de selección
-  const handleSelect = (optionValue: string) => {
-    if (mode === 'single') {
-      setSelectedValues([optionValue]);
-      onChange?.(optionValue);
-      setIsOpen(false);
-      setSearchQuery('');
-    } else if (mode === 'multi') {
-      const newValues = selectedValues.includes(optionValue)
-        ? selectedValues.filter((v) => v !== optionValue)
-        : [...selectedValues, optionValue];
-      setSelectedValues(newValues);
-      onChange?.(newValues);
-    } else if (mode === 'smart') {
-      setSelectedValues([optionValue]);
-      onChange?.(optionValue);
-      setIsOpen(false);
-      setSearchQuery('');
+    // Extract aria-* props to forward to SelectTrigger (accessibility)
+    const ariaProps: Record<string, unknown> = {};
+    const divProps: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(rest)) {
+      if (key.startsWith("aria-") || key === "data-slot") {
+        ariaProps[key] = val;
+      } else {
+        divProps[key] = val;
+      }
     }
-  };
 
-  const isSelected = (optionValue: string) => selectedValues.includes(optionValue);
+    return (
+      <div ref={ref} className="space-y-1.5" {...divProps}>
+        {/* Label */}
+        {label && (
+          <Label htmlFor={id} className="text-xs text-label-foreground">
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </Label>
+        )}
 
-  const getDisplayLabel = () => {
-    if (selectedValues.length === 0) return placeholder;
-    if (mode === 'multi') {
-      return `${selectedValues.length} seleccionado${selectedValues.length > 1 ? 's' : ''}`;
-    }
-    const selected = options.find((opt) => opt.value === selectedValues[0]);
-    return selected?.label || placeholder;
-  };
-
-  // ==================== RENDERIZADO ====================
-
-  return (
-    <div className="space-y-1.5">
-      {/* Label */}
-      {label && (
-        <Label htmlFor={id} className="text-xs text-gray-600">
-          {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </Label>
-      )}
-
-      {/* Select Container */}
-      <div className="relative">
-        {/* Trigger Button */}
-        <button
-          type="button"
-          id={id}
+        {/* Select usando Shadcn/Radix UI */}
+        <Select
+          name={name}
+          value={value || ""}
+          onValueChange={onChange}
           disabled={disabled}
-          onClick={() => !disabled && setIsOpen(!isOpen)}
-          className={`
-            w-full h-9 px-3 py-2 text-left text-sm
-            border border-gray-300 rounded-md bg-white
-            flex items-center justify-between
-            transition-colors
-            ${disabled ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'hover:border-gray-400'}
-            ${isOpen ? 'border-blue-500 ring-2 ring-blue-100' : ''}
-            ${error ? 'border-red-500' : ''}
-          `}
         >
-          <span className={selectedValues.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
-            {getDisplayLabel()}
-          </span>
-          <svg
-            className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+          <SelectTrigger
+            id={id}
+            className={`h-9 text-sm ${error ? "border-red-500" : ""}`}
+            {...ariaProps}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-
-        {/* Dropdown */}
-        {isOpen && (
-          <>
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 z-10"
-              onClick={() => setIsOpen(false)}
-            />
-
-            {/* Dropdown Content */}
-            <div
-              className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden"
-              style={{ maxHeight }}
-            >
-              {/* Search Bar */}
-              {searchable && (
-                <div className="p-2 border-b border-gray-100">
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder={searchPlaceholder}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full h-8 pl-8 pr-8 text-sm border border-gray-200 rounded focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
+            <SelectValue placeholder={placeholder} />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            {/* Search Bar */}
+            {searchable && options.length > 5 && (
+              <div className="p-2 border-b">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder={searchPlaceholder}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-8 pl-8 text-sm"
+                    onClick={(e) => e.stopPropagation()}
+                  />
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Filters (modo smart) */}
-              {mode === 'smart' && filters && filters.length > 0 && (
-                <div className="flex gap-1 px-3 py-2 border-b border-gray-100 bg-gray-50">
-                  {filters.map((filter) => (
-                    <button
-                      key={filter.id}
-                      onClick={() => onFilterChange?.(filter.id)}
-                      className={`
-                        px-3 py-1 text-xs rounded transition-colors
-                        ${
-                          activeFilter === filter.id
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                        }
-                      `}
-                    >
-                      {filter.label}
-                    </button>
-                  ))}
+            {/* Options */}
+            <div className="max-h-[300px] overflow-y-auto">
+              {filteredOptions.length === 0 ? (
+                <div className="px-2 py-6 text-center text-sm text-gray-500">
+                  No se encontraron resultados
                 </div>
-              )}
-
-              {/* Options List */}
-              <div className="overflow-y-auto" style={{ maxHeight: 'calc(320px - 80px)' }}>
-                {filteredOptions.length === 0 ? (
-                  <div className="px-3 py-8 text-center text-sm text-gray-500">
-                    No se encontraron resultados
-                  </div>
-                ) : (
-                  filteredOptions.map((option) => (
-                    <div key={option.value}>
-                      {renderOption ? (
-                        <div onClick={() => handleSelect(option.value)}>
-                          {renderOption(option)}
-                        </div>
-                      ) : mode === 'single' ? (
-                        <SingleOption
-                          option={option}
-                          isSelected={isSelected(option.value)}
-                          onClick={() => handleSelect(option.value)}
-                        />
-                      ) : mode === 'multi' ? (
-                        <MultiOption
-                          option={option}
-                          isSelected={isSelected(option.value)}
-                          onClick={() => handleSelect(option.value)}
-                        />
-                      ) : (
-                        <SmartOptionItem
-                          option={option}
-                          isSelected={isSelected(option.value)}
-                          onClick={() => handleSelect(option.value)}
-                        />
+              ) : (
+                filteredOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <div className="flex items-center gap-2 max-w-full">
+                      <span className="text-sm font-medium truncate shrink-0">{option.label}</span>
+                      {option.subtitle && (
+                        <span className="text-xs text-gray-500 truncate shrink min-w-0">
+                          {option.subtitle}
+                        </span>
+                      )}
+                      {option.secondaryId && (
+                        <span className="text-xs text-gray-400 shrink-0 ml-auto">
+                          {option.secondaryId}
+                        </span>
                       )}
                     </div>
-                  ))
-                )}
-              </div>
+                  </SelectItem>
+                ))
+              )}
             </div>
-          </>
+          </SelectContent>
+        </Select>
+
+        {/* Help Text */}
+        {helpText && !error && (
+          <p className="text-xs text-gray-500">{helpText}</p>
         )}
+
+        {/* Error Message */}
+        {error && <p className="text-xs text-red-500">{error}</p>}
       </div>
-
-      {/* Help Text / Error */}
-      {helpText && !error && (
-        <p className="text-xs text-gray-500">{helpText}</p>
-      )}
-      {error && (
-        <p className="text-xs text-red-500">{error}</p>
-      )}
-    </div>
-  );
-}
-
-// ==================== OPTION COMPONENTS ====================
-
-// Single Select Option (Imagen 1)
-function SingleOption({
-  option,
-  isSelected,
-  onClick,
-}: {
-  option: SmartOption;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`
-        w-full px-3 py-2.5 text-left text-sm transition-colors
-        hover:bg-gray-50
-        ${isSelected ? 'bg-blue-50 text-blue-700' : 'text-gray-900'}
-      `}
-    >
-      {option.label}
-    </button>
-  );
-}
-
-// Multi Select Option (Imagen 2)
-function MultiOption({
-  option,
-  isSelected,
-  onClick,
-}: {
-  option: SmartOption;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full px-3 py-2.5 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
-    >
-      <Checkbox checked={isSelected} />
-      <span className="text-sm text-gray-900">{option.label}</span>
-    </button>
-  );
-}
-
-// Smart Select Option (Imagen 3)
-function SmartOptionItem({
-  option,
-  isSelected,
-  onClick,
-}: {
-  option: SmartOption;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`
-        w-full px-3 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100
-        ${isSelected ? 'bg-blue-50' : ''}
-      `}
-    >
-      {/* Header con ID, Secondary ID y Score */}
-      <div className="flex items-start justify-between mb-1">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-900">{option.label}</span>
-          {option.secondaryId && (
-            <span className="text-xs text-gray-500">({option.secondaryId})</span>
-          )}
-          {option.utilization !== undefined && (
-            <span className={`text-xs font-medium ${
-              option.utilization >= 100 ? 'text-green-600' : 'text-gray-600'
-            }`}>
-              {option.utilization}% útil.
-            </span>
-          )}
-        </div>
-        {option.score !== undefined && (
-          <span className="text-xs text-gray-500">Score: {option.score}</span>
-        )}
-      </div>
-
-      {/* Subtitle */}
-      {option.subtitle && (
-        <div className="text-xs text-gray-600 mb-2">{option.subtitle}</div>
-      )}
-
-      {/* Tags/Badges */}
-      {option.tags && option.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {option.tags.map((tag, index) => (
-            <span
-              key={index}
-              className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Metadata adicional */}
-      {option.metadata && option.metadata.length > 0 && (
-        <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-600">
-          {option.metadata.map((meta, index) => (
-            <span key={index}>
-              {meta.label}: <span className="font-medium">{meta.value}</span>
-            </span>
-          ))}
-        </div>
-      )}
-    </button>
-  );
-}
+    );
+  },
+);

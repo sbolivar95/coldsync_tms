@@ -22,42 +22,39 @@ export function DataTablePagination({
 }: DataTablePaginationProps) {
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
-    
+
     if (totalPages <= 7) {
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
       }
     } else {
       pages.push(1);
-      
+
       if (currentPage > 3) {
         pages.push('...');
       }
-      
+
       const start = Math.max(2, currentPage - 1);
       const end = Math.min(totalPages - 1, currentPage + 1);
-      
+
       for (let i = start; i <= end; i++) {
         if (!pages.includes(i)) {
           pages.push(i);
         }
       }
-      
+
       if (currentPage < totalPages - 2) {
         pages.push('...');
       }
-      
+
       pages.push(totalPages);
     }
-    
+
     return pages;
   };
 
   return (
     <div className="px-6 py-4 border-t border-gray-200 bg-white flex items-center justify-between">
-      <div className="text-sm text-gray-700">
-        Mostrando {startIndex + 1} a {Math.min(endIndex, totalItems)} de {totalItems} {itemLabel}
-      </div>
       <div className="flex items-center gap-1.5">
         <Button
           variant="outline"
@@ -69,7 +66,7 @@ export function DataTablePagination({
         >
           <span className="text-xs">&laquo;</span>
         </Button>
-        
+
         <Button
           variant="outline"
           size="sm"
@@ -80,9 +77,9 @@ export function DataTablePagination({
         >
           <ChevronLeft className="w-3.5 h-3.5" />
         </Button>
-        
+
         <div className="flex items-center gap-0.5">
-          {getPageNumbers().map((page, index) => 
+          {getPageNumbers().map((page, index) =>
             page === '...' ? (
               <span key={`ellipsis-${index}`} className="px-1.5 text-sm text-gray-400">...</span>
             ) : (
@@ -91,7 +88,6 @@ export function DataTablePagination({
                 variant={currentPage === page ? "default" : "outline"}
                 size="sm"
                 className="h-7 w-7 p-0 text-xs"
-                style={currentPage === page ? { backgroundColor: '#004ef0' } : {}}
                 onClick={() => onPageChange(page as number)}
               >
                 {page}
@@ -99,7 +95,7 @@ export function DataTablePagination({
             )
           )}
         </div>
-        
+
         <Button
           variant="outline"
           size="sm"
@@ -110,7 +106,7 @@ export function DataTablePagination({
         >
           <ChevronRight className="w-3.5 h-3.5" />
         </Button>
-        
+
         <Button
           variant="outline"
           size="sm"
@@ -121,6 +117,9 @@ export function DataTablePagination({
         >
           <span className="text-xs">&raquo;</span>
         </Button>
+      </div>
+      <div className="text-sm text-gray-700">
+        Mostrando {startIndex + 1} a {Math.min(endIndex, totalItems)} de {totalItems} {itemLabel}
       </div>
     </div>
   );

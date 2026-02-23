@@ -98,19 +98,19 @@ export const TableActions = {
   /**
    * Botón de filtro con dropdown
    */
-  FilterDropdown: ({ 
-    onClick, 
+  FilterDropdown: ({
+    onClick,
     label = "Filtros",
-    active = false 
-  }: { 
-    onClick: () => void; 
+    active = false
+  }: {
+    onClick: () => void;
     label?: string;
     active?: boolean;
   }) => (
     <SecondaryButton
       onClick={onClick}
       icon={Filter}
-      className={active ? 'bg-blue-50 border-blue-300' : ''}
+      className={active ? 'bg-primary-light border-primary/30' : ''}
     >
       {label}
     </SecondaryButton>
@@ -119,11 +119,11 @@ export const TableActions = {
   /**
    * Botón de dropdown genérico
    */
-  Dropdown: ({ 
-    label, 
-    onClick 
-  }: { 
-    label: string; 
+  Dropdown: ({
+    label,
+    onClick
+  }: {
+    label: string;
     onClick: () => void;
   }) => (
     <SecondaryButton
@@ -162,8 +162,8 @@ export function QuickFilterTabs({ tabs, activeTab, onTabChange }: QuickFilterTab
               onClick={() => onTabChange(tab.id)}
               className={`
                 relative py-4 text-sm transition-colors
-                ${activeTab === tab.id 
-                  ? 'text-gray-900' 
+                ${activeTab === tab.id
+                  ? 'text-gray-900'
                   : 'text-gray-600 hover:text-gray-900'
                 }
               `}
@@ -172,8 +172,8 @@ export function QuickFilterTabs({ tabs, activeTab, onTabChange }: QuickFilterTab
               {tab.count !== undefined && (
                 <span className={`
                   ml-2 px-2 py-0.5 rounded-full text-xs
-                  ${activeTab === tab.id 
-                    ? 'bg-blue-100 text-blue-700' 
+                  ${activeTab === tab.id
+                    ? 'bg-primary-light text-primary'
                     : 'bg-gray-100 text-gray-600'
                   }
                 `}>
@@ -181,9 +181,8 @@ export function QuickFilterTabs({ tabs, activeTab, onTabChange }: QuickFilterTab
                 </span>
               )}
               {activeTab === tab.id && (
-                <div 
-                  className="absolute bottom-0 left-0 right-0 h-0.5"
-                  style={{ backgroundColor: '#004ef0' }}
+                <div
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
                 />
               )}
             </button>
@@ -223,10 +222,10 @@ export function TableHeader({
   return (
     <>
       {tabs && activeTab && onTabChange && (
-        <QuickFilterTabs 
-          tabs={tabs} 
-          activeTab={activeTab} 
-          onTabChange={onTabChange} 
+        <QuickFilterTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={onTabChange}
         />
       )}
       <TableToolbar

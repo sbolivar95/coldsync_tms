@@ -71,12 +71,12 @@ export function EditableDropdownField({
       </label>
       <button
         onClick={() => setIsEditing(true)}
-        className="text-sm text-gray-900 font-medium hover:text-[#004ef0] text-left min-h-[20px] flex items-center gap-1.5 group"
+        className="text-sm text-gray-900 font-medium hover:text-primary text-left min-h-[20px] flex items-center gap-1.5 group"
       >
         <span className="group-hover:underline">
           {displayValue || value || "Click para editar"}
         </span>
-        <Pencil className="w-3 h-3 text-gray-400 group-hover:text-[#004ef0] transition-colors" />
+        <Pencil className="w-3 h-3 text-gray-400 group-hover:text-primary transition-colors" />
       </button>
     </div>
   );

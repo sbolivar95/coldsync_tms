@@ -1,311 +1,190 @@
-import { DataTable } from '../../../../components/widgets/DataTable/DataTable'
-import { DataTableColumn } from '../../../../components/widgets/DataTable/types'
-import { Pencil, Trash2 } from 'lucide-react'
-import { Badge } from '../../../../components/ui/Badge'
-import { useState, useEffect, useMemo } from 'react'
-import { trailersService } from '../../../../services/trailers.service'
-import { carriersService } from '../../../../services/carriers.service'
-import { useOrganization } from '../../../../hooks/useOrganization'
-import type { Trailer } from '../../../../types/database.types'
+import { DataTable } from "../../../../components/widgets/DataTable/DataTable";
+import { DataTableColumn } from "../../../../components/widgets/DataTable/types";
+import { Pencil, Trash2 } from "lucide-react";
+import { Badge } from "../../../../components/ui/Badge";
+import type { Trailer, TrailerReeferSpecs, Carrier } from "../../../../types/database.types";
+
+// Exported type for trailers with carrier and reefer specs info
+export type TrailerWithDetails = Trailer & {
+  carrier?: Carrier;
+  reeferSpecs?: TrailerReeferSpecs | null;
+};
 
 interface TrailersListProps {
-  onSelectItem: (item: any, type: 'remolque') => void
-  transportistaNombre?: string
-  searchTerm?: string
-  onCountChange?: (count: number) => void
+  data: TrailerWithDetails[];
+  onSelectItem: (item: Trailer, type: "remolque") => void;
+  onEditTrailer?: (item: Trailer) => void;
+  transportistaNombre?: string;
+  carrierId?: number; // ID del transportista para filtrar
 }
 
 export function TrailersList({
+  data,
   onSelectItem,
-  transportistaNombre = '',
-  searchTerm = '',
-  onCountChange,
+  onEditTrailer,
+  transportistaNombre,
+  carrierId
 }: TrailersListProps) {
-  const { orgId, loading: orgLoading } = useOrganization()
-  const [trailers, setTrailers] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [carrierId, setCarrierId] = useState<number | null>(null)
 
-  // Resolve carrierId from carrier name (if provided)
-  useEffect(() => {
-    if (!orgId) return
+  // Helper function to get status label in Spanish
+  const getStatusLabel = (status: string) => {
+    const statusMap: Record<string, string> = {
+      "ACTIVE": "Activo",
+      "IN_SERVICE": "En Servicio",
+      "IN_MAINTENANCE": "Mantenimiento",
+      "OUT_OF_SERVICE": "Fuera de Servicio",
+      "RETIRED": "Retirado",
+      "IN_TRANSIT": "En Tránsito",
+    };
+    return statusMap[status] || status;
+  };
 
-    // If no carrier filter provided, load all trailers
-    if (!transportistaNombre?.trim()) {
-      setCarrierId(null)
-      return
+  // Helper function to get status badge class
+  const getStatusBadgeClass = (status: string) => {
+    if (status === "ACTIVE") return "bg-green-100 text-green-700 hover:bg-green-100 text-xs";
+    if (status === "IN_MAINTENANCE") return "bg-yellow-100 text-yellow-700 hover:bg-yellow-100 text-xs";
+    if (status === "OUT_OF_SERVICE" || status === "RETIRED") return "bg-gray-200 text-gray-700 hover:bg-gray-200 text-xs";
+    return "bg-primary-light text-primary hover:bg-primary-light text-xs";
+  };
+
+  // Helper function to format temperature range
+  const formatTempRange = (trailer: TrailerWithDetails) => {
+    if (trailer.reeferSpecs?.temp_min_c !== null && trailer.reeferSpecs?.temp_min_c !== undefined &&
+      trailer.reeferSpecs?.temp_max_c !== null && trailer.reeferSpecs?.temp_max_c !== undefined) {
+      return `${trailer.reeferSpecs.temp_min_c}°C / ${trailer.reeferSpecs.temp_max_c}°C`;
     }
+    return "-";
+  };
 
-    let cancelled = false
-
-    async function getCarrierId() {
-      try {
-        const carriers = await carriersService.search(
-          orgId!,
-          transportistaNombre
-        )
-        const carrier = carriers.find(
-          (c) => c.commercial_name === transportistaNombre
-        )
-        if (!cancelled) {
-          setCarrierId(carrier?.id ?? null)
-        }
-      } catch (err) {
-        console.error('Error finding carrier:', err)
-        if (!cancelled) setCarrierId(null)
-      }
-    }
-
-    getCarrierId()
-
-    return () => {
-      cancelled = true
-    }
-  }, [orgId, transportistaNombre])
-
-  // Load trailers with reefer specs (filtered by carrier if carrierId is set)
-  useEffect(() => {
-    if (!orgId || orgLoading) return
-
-    let cancelled = false
-
-    async function loadTrailers() {
-      try {
-        setLoading(true)
-        // Get all trailers with reefer specs
-        const data = await trailersService.getAllWithReeferSpecs(orgId!)
-
-        // Filter by carrier if carrierId is set
-        const filtered = carrierId
-          ? data.filter((t: any) => t.carrier_id === carrierId)
-          : data
-
-        if (!cancelled) setTrailers(filtered)
-      } catch (err) {
-        console.error('Error loading trailers:', err)
-        if (!cancelled) setTrailers([])
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    loadTrailers()
-
-    return () => {
-      cancelled = true
-    }
-  }, [orgId, orgLoading, carrierId])
-
-  // Client-side search filter
-  const filteredTrailers = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase()
-    if (!q) return trailers
-
-    return trailers.filter((t) => {
-      return [
-        t.code,
-        t.plate,
-        t.operational_status,
-        t.trailer_reefer_specs?.refrigeration_brand,
-      ]
-        .filter(Boolean)
-        .some((x) => String(x).toLowerCase().includes(q))
-    })
-  }, [trailers, searchTerm])
-
-  // Report count to parent for the badge
-  useEffect(() => {
-    onCountChange?.(filteredTrailers.length)
-  }, [filteredTrailers.length, onCountChange])
-
-  const handleDelete = async (trailer: Trailer) => {
-    if (!orgId) return
-
-    if (!confirm(`¿Está seguro de eliminar el remolque "${trailer.code}"?`)) {
-      return
-    }
-
-    try {
-      await trailersService.delete(trailer.id, orgId)
-      // Reload trailers with same filter
-      const data = await trailersService.getAllWithReeferSpecs(orgId)
-      const filtered = carrierId
-        ? data.filter((t: any) => t.carrier_id === carrierId)
-        : data
-      setTrailers(filtered)
-    } catch (err) {
-      console.error('Error deleting trailer:', err)
-      alert('Error al eliminar el remolque')
-    }
-  }
-
-  // Helper to get status badge style
-  const getStatusBadge = (status: string) => {
-    const styles: Record<string, string> = {
-      ACTIVE: 'bg-green-100 text-green-700 hover:bg-green-100',
-      IN_MAINTENANCE: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100',
-      IN_TRANSIT: 'bg-blue-100 text-blue-700 hover:bg-blue-100',
-      IN_SERVICE: 'bg-purple-100 text-purple-700 hover:bg-purple-100',
-      OUT_OF_SERVICE: 'bg-red-100 text-red-700 hover:bg-red-100',
-      RETIRED: 'bg-gray-300 text-gray-700 hover:bg-gray-300',
-    }
-    const labels: Record<string, string> = {
-      ACTIVE: 'Activo',
-      IN_MAINTENANCE: 'En Mantenimiento',
-      IN_TRANSIT: 'En Tránsito',
-      IN_SERVICE: 'En Servicio',
-      OUT_OF_SERVICE: 'Fuera de Servicio',
-      RETIRED: 'Retirado',
-    }
-    return {
-      style: styles[status] || 'bg-gray-200 text-gray-700 hover:bg-gray-200',
-      label: labels[status] || status,
-    }
-  }
-
-  // Columns for Trailers
-  const trailerColumns: DataTableColumn<any>[] = [
+  // Columnas para Remolques
+  const trailerColumns: DataTableColumn<TrailerWithDetails>[] = [
     {
-      key: 'unidad',
-      header: 'Unidad',
+      key: "unidad",
+      header: "Unidad",
       render: (trailer) => (
-        <div className='flex flex-col gap-0.5'>
+        <div className="flex flex-col gap-0.5">
           <button
-            onClick={() => onSelectItem(trailer, 'remolque')}
-            className='text-sm text-left hover:underline font-medium'
-            style={{ color: '#004ef0' }}
+            onClick={() => onSelectItem(trailer, "remolque")}
+            className="text-sm text-left hover:underline font-medium text-primary"
           >
             {trailer.code}
           </button>
-          <span className='text-xs text-gray-500'>{trailer.plate}</span>
+          <span className="text-xs text-gray-500">{trailer.plate}</span>
         </div>
       ),
     },
     {
-      key: 'tipo',
-      header: 'Configuración',
+      key: "capacidad",
+      header: "Capacidad",
+      render: (trailer) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-gray-900">{trailer.transport_capacity_weight_tn} Tn</span>
+          <span className="text-xs text-gray-500">{trailer.volume_m3} m³</span>
+        </div>
+      ),
+    },
+    {
+      key: "rangoTermico",
+      header: "Rango Térmico",
+      render: (trailer) => (
+        <span className="text-xs text-gray-900">{formatTempRange(trailer)}</span>
+      ),
+    },
+    {
+      key: "transportista",
+      header: "Transportista",
+      render: (trailer) => (
+        <span className="text-xs text-gray-900">{trailer.carrier?.commercial_name || "-"}</span>
+      ),
+    },
+    {
+      key: "estado",
+      header: "Estado",
       render: (trailer) => (
         <Badge
-          variant='secondary'
-          className={
-            trailer.supports_multi_zone
-              ? 'bg-purple-100 text-purple-700 hover:bg-purple-100 text-xs'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-200 text-xs'
-          }
+          variant="default"
+          className={getStatusBadgeClass(trailer.operational_status)}
         >
-          {trailer.supports_multi_zone
-            ? `Multi-zona (${trailer.compartments})`
-            : 'Zona única'}
+          {getStatusLabel(trailer.operational_status)}
         </Badge>
       ),
     },
     {
-      key: 'capacidad',
-      header: 'Capacidad',
-      render: (trailer) => (
-        <div className='flex flex-col gap-0.5'>
-          <span className='text-xs text-gray-900'>
-            {trailer.transport_capacity_weight_tn} TN
-          </span>
-          <span className='text-xs text-gray-500'>{trailer.volume_m3} m³</span>
-        </div>
-      ),
-      width: 'w-24',
-    },
-    {
-      key: 'dimensiones',
-      header: 'Dimensiones',
-      render: (trailer) => (
-        <span className='text-xs text-gray-900'>
-          {trailer.length_m}m × {trailer.width_m}m × {trailer.height_m}m
-        </span>
-      ),
-    },
-    {
-      key: 'refrigeracion',
-      header: 'Refrigeración',
+      key: "configTermica",
+      header: "Config. Térmica",
       render: (trailer) => {
-        const specs = trailer.trailer_reefer_specs
-        if (!specs) return <span className='text-xs text-gray-400'>-</span>
-        return (
-          <div className='flex flex-col gap-0.5'>
-            <span className='text-xs text-gray-900'>
-              {specs.refrigeration_brand || specs.brand}
-            </span>
-            <span className='text-xs text-gray-500'>
-              {specs.temp_min_c}°C a {specs.temp_max_c}°C
-            </span>
-          </div>
-        )
-      },
-    },
-    {
-      key: 'estado',
-      header: 'Estado',
-      render: (trailer) => {
-        const { style, label } = getStatusBadge(trailer.operational_status)
+        const isMultiZone = trailer.supports_multi_zone;
+
+        if (isMultiZone) {
+          return (
+            <Badge
+              className="bg-hibrido-bg text-hibrido-text hover:bg-hibrido-bg border-0 text-xs"
+            >
+              Híbrido
+            </Badge>
+          );
+        }
+
         return (
           <Badge
-            variant='default'
-            className={`${style} text-xs`}
+            variant="secondary"
+            className="bg-gray-100 text-gray-600 hover:bg-gray-100 text-xs border-0"
           >
-            {label}
+            Standard
           </Badge>
-        )
+        );
       },
-      width: 'w-32',
     },
-  ]
+  ];
 
-  // Row actions
+  // Ocultar columna de transportista si estamos filtrando por uno
+  const visibleTrailerColumns = carrierId || transportistaNombre
+    ? trailerColumns.filter(col => col.key !== "transportista")
+    : trailerColumns;
+
+  // Acciones individuales para remolques
   const trailerActions = [
     {
-      icon: <Pencil className='w-3.5 h-3.5 text-gray-600' />,
-      onClick: (trailer: any) => onSelectItem(trailer, 'remolque'),
-      title: 'Editar',
+      icon: <Pencil className="w-3.5 h-3.5 text-gray-600" />,
+      title: onEditTrailer ? "Editar" : "Ver detalles",
+      onClick: (trailer: TrailerWithDetails) => {
+        if (onEditTrailer) {
+          onEditTrailer(trailer);
+        } else {
+          onSelectItem(trailer, "remolque");
+        }
+      },
     },
     {
-      icon: <Trash2 className='w-3.5 h-3.5 text-red-600' />,
-      onClick: handleDelete,
-      variant: 'destructive' as const,
-      title: 'Eliminar',
+      icon: <Trash2 className="w-3.5 h-3.5 text-red-600" />,
+      title: "Eliminar",
+      onClick: (trailer: TrailerWithDetails) => console.log("Delete trailer:", trailer.id),
     },
-  ]
+  ];
 
-  // Show loading state
-  if (orgLoading || loading) {
-    return (
-      <div className='flex items-center justify-center py-12'>
-        <div className='inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent'></div>
-        <span className='ml-2 text-sm text-gray-600'>
-          Cargando remolques...
-        </span>
-      </div>
-    )
-  }
-
-  // Show message if no org selected
-  if (!orgId) {
-    return (
-      <div className='flex items-center justify-center py-12'>
-        <div className='text-center'>
-          <p className='text-gray-500 mb-2'>No hay organización seleccionada</p>
-          <p className='text-sm text-gray-400'>
-            Selecciona una organización en Configuración para ver los remolques
-          </p>
-        </div>
-      </div>
-    )
-  }
+  // Acciones masivas
+  const bulkActions = [
+    {
+      icon: <Trash2 className="w-4 h-4" />,
+      label: "Eliminar",
+      variant: "destructive" as const,
+      onClick: (selectedIds: string[]) => {
+        console.log("Delete items:", selectedIds);
+      },
+    },
+  ];
 
   return (
     <DataTable
-      data={filteredTrailers}
-      columns={trailerColumns}
-      getRowId={(t) => t.id}
+      data={data}
+      columns={visibleTrailerColumns}
+      getRowId={(trailer) => trailer.id}
       actions={trailerActions}
+      bulkActions={bulkActions}
       itemsPerPage={10}
-      emptyMessage='No hay remolques para mostrar'
+      emptyMessage="No hay remolques disponibles"
+      totalLabel="remolques"
     />
-  )
+  );
 }
+

@@ -7,6 +7,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
 dist
 dist-ssr
@@ -23,11 +24,18 @@ dist-ssr
 *.sln
 *.sw?
 
+# Cursor AI
+# .cursor/
+
+# Kiro/MCP settings (may contain sensitive config)
+# .kiro/
+
 # Environment variables
 .env
 .env.local
 .env.production.local
 .env.development.local
+.env.*.local
 
 # Build output
 build
@@ -35,9 +43,20 @@ build
 
 # Testing
 coverage
+.nyc_output
 
 # Misc
 .cache
 .temp
 .tmp
+*.pem
 
+# OS
+Thumbs.db
+.DS_Store
+
+# Supabase
+.supabase/
+
+# Project-specific
+other_project/

@@ -8,6 +8,7 @@ interface SecondaryButtonProps {
   disabled?: boolean;
   type?: "button" | "submit" | "reset";
   className?: string;
+  size?: "default" | "sm" | "lg" | "icon";
 }
 
 export function SecondaryButton({
@@ -17,11 +18,13 @@ export function SecondaryButton({
   disabled = false,
   type = "button",
   className = "",
+  size = "default",
 }: SecondaryButtonProps) {
   return (
     <Button
       type={type}
       variant="outline"
+      size={size}
       onClick={onClick}
       disabled={disabled}
       className={`gap-2 ${className}`}

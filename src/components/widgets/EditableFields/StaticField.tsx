@@ -4,8 +4,8 @@ interface StaticFieldProps {
 }
 
 /**
- * Componente para mostrar un campo estático (solo lectura)
- * Útil para mostrar información que no necesita edición
+ * Static field component (read-only).
+ * Use for displaying information that does not require editing.
  */
 export function StaticField({ label, value }: StaticFieldProps) {
   return (
@@ -19,7 +19,7 @@ export function StaticField({ label, value }: StaticFieldProps) {
               part === "->" || part === "→" ? (
                 <span
                   key={index}
-                  className="text-[#004ef0] font-bold"
+                  className="text-primary font-bold"
                 >
                   →
                 </span>
